@@ -1,0 +1,114 @@
+@import "tailwindcss";
+
+/* Paper and ink: warm paper ground,
+   near-black ink, muted hue families. Color says the family, shape says
+   the type, selection has three tiers and no glow. */
+:root {
+  --paper: #f7f3ea;
+  --paper-raised: #fffdf7;
+  --ink: #1c1917;
+  --ink-soft: #57534e;
+  --ink-faint: #a8a29e;
+  --line: #d6cfc2;
+  --fam-infra: #2f5d50;    /* services, frontends, datastores, schedulers */
+  --fam-depth: #33526e;    /* concepts */
+  --fam-fire: #8a3b2e;     /* incidents */
+  --fam-cloud: #6b5b95;    /* aws equivalents */
+  --fam-ci: #7a6c3c;       /* github actions patterns */
+  --fam-practice: #9c5a28; /* python live-coding exercises */
+  --select-1: #1c1917;
+  --select-2: rgba(28, 25, 23, 0.45);
+  --select-3: rgba(28, 25, 23, 0.2);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --paper: #191715;
+    --paper-raised: #221f1c;
+    --ink: #ede7dc;
+    --ink-soft: #b8b0a4;
+    --ink-faint: #6e675e;
+    --line: #3a352f;
+    --fam-infra: #7fae9d;
+    --fam-depth: #8db0cc;
+    --fam-fire: #d08a7a;
+    --fam-cloud: #b3a6d6;
+    --fam-ci: #c3b586;
+    --fam-practice: #d69a63;
+    --select-1: #ede7dc;
+    --select-2: rgba(237, 231, 220, 0.45);
+    --select-3: rgba(237, 231, 220, 0.2);
+  }
+}
+
+html, body, #root { height: 100%; }
+
+body {
+  margin: 0;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+
+.mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+
+.graph-node { cursor: pointer; }
+.graph-node:focus { outline: none; }
+.graph-node:focus-visible circle,
+.graph-node:focus-visible rect,
+.graph-node:focus-visible polygon {
+  stroke: var(--select-1);
+  stroke-width: 2.5;
+}
+
+.node-label {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 10px;
+  fill: var(--ink-soft);
+  pointer-events: none;
+  paint-order: stroke;
+  stroke: var(--paper);
+  stroke-width: 3px;
+}
+
+.edge-line { stroke: var(--line); }
+.edge-line.dim { opacity: 0.25; }
+.edge-line.hot { stroke: var(--select-1); }
+
+.panel-scroll::-webkit-scrollbar { width: 8px; }
+.panel-scroll::-webkit-scrollbar-thumb { background: var(--line); border-radius: 4px; }
+
+/* Self-test mode: talking points stay blurred until revealed one by one. */
+.tp-hidden {
+  filter: blur(6px);
+  user-select: none;
+  cursor: pointer;
+}
+
+.chip {
+  border: 1px solid var(--line);
+  border-radius: 9999px;
+  padding: 1px 8px;
+  font-size: 11px;
+  color: var(--ink-soft);
+  background: var(--paper-raised);
+}
+.chip.clickable { cursor: pointer; }
+.chip.clickable:hover { border-color: var(--ink-soft); color: var(--ink); }
+
+button.ctl {
+  border: 1px solid var(--line);
+  background: var(--paper-raised);
+  color: var(--ink);
+  border-radius: 6px;
+  padding: 3px 10px;
+  font-size: 12px;
+  cursor: pointer;
+}
+button.ctl:hover { border-color: var(--ink-soft); }
+button.ctl.active { background: var(--ink); color: var(--paper); border-color: var(--ink); }
+button.ctl:disabled { opacity: 0.4; cursor: default; }
+
+@media (prefers-reduced-motion: reduce) {
+  .tp-hidden { filter: none; text-decoration: underline dotted; }
+}
