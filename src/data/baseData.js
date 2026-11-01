@@ -1,0 +1,801 @@
+// Hand-authored interview graph: a GCP + Vercel + AWS + GitHub Actions estate,
+// structured to train one skill - talking like an expert for two hours.
+// Numbers are illustrative examples; say "as of the September audit" out loud.
+//
+// Node shape: { id, type, label, summary, talkingPoints: [...], evidence: [] }
+// talkingPoints are written to be SPOKEN - claim, mechanism, a number, a trade-off.
+
+export const NODES = [
+  // ── Cloud Run services and jobs ─────────────────────────────────────────
+  { id: 'svc-data-api', type: 'service', label: 'data-api',
+    summary: 'FastAPI data API on Cloud Run, us-central1. Illustrative sizing: 1 GiB, 1 vCPU, startup-cpu-boost, a low max-instances cap; IAM-public with auth enforced in-app. Ships via manual cloudbuild: docker build, push to Artifact Registry, gcloud run deploy.',
+    talkingPoints: [
+      'The deploy is one command: gcloud builds submit --config backend/cloudbuild.yaml, which builds the image, pushes to Artifact Registry, and runs gcloud run deploy with --set-secrets and --set-env-vars. Manual, no build triggers - that is the deploy gap I would close first with a trigger on merge gated on CI.',
+      'A dozen secrets bind at deploy time via Secret Manager references - market-data keys, LLM provider keys, a scheduler token, payments - never plaintext env. Because --set-secrets replaces the whole set, the cloudbuild.yaml secrets line is a live-config diff: the September audit caught that it bound GEMINI_API_KEY but not the hand-added OPENROUTER_API_KEY, so the next deploy would have silently dropped it.',
+      'The service is public at the IAM layer and protected in the app: an auth helper validates a Google OIDC bearer token against the expected audience and scheduler service account, with a shared-secret header as fallback so CI can call it without a Google identity. The stricter design is IAM run.invoker for the scheduler SA only - I can defend the trade either way.',
+      'The 9:35 AM bake fans out from this service to analysis-api over HTTP - /scan plus several compute endpoints - as stage 4 of 9 in the refresh cycle. Service-to-service over plain HTTPS because both are public-with-app-auth.',
+      'Sizing story (illustrative): 1 GiB and 1 vCPU with a low max-instances cap. The cap is why a burst of /quotes calls hitting a rate-limited vendor ended in 503s - instances waited on upstream, the pool saturated, and the cap meant no more capacity. Claim, mechanism, number, trade-off.',
+    ],
+    evidence: ['quotes-api/backend/cloudbuild.yaml', 'quotes-api/README.md', 'quotes-api/ARCHITECTURE.md'] },
+
+  { id: 'svc-analysis-api', type: 'service', label: 'analysis-api',
+    summary: 'Second Cloud Run service: deep analysis, compute and scan endpoints, yfinance-heavy, its own Firestore cache. Same cloudbuild deploy shape, no secrets bound.',
+    talkingPoints: [
+      'It exists because the heavy analysis work is CPU-bound Python - separating it keeps the main API responsive and lets each service scale independently. One CPU-bound request can starve the other 79 slots on a shared instance.',
+      'Called by data-api during the 9:35 bake fan-out: /scan plus several compute endpoints. Same project, same region, same manual cloudbuild pattern - so it shares the same deploy-gap weakness.',
+      'It keeps its own Firestore cache (analysis_cache), so a cache purge on the main backend does not stall the analysis paths.',
+    ],
+    evidence: ['quotes-api/backend2/cloudbuild.yaml', 'quotes-api/ARCHITECTURE.md'] },
+
+  { id: 'svc-ledger-api', type: 'service', label: 'ledger-api',
+    summary: 'Cloud Run service for the position-verdict engine. deploy-backend.sh assembles a merged build context - mcp-engine src plus compute modules plus its own main/core - then gcloud run deploy --source. Dockerfile is mambaorg/micromamba multi-stage with a conda env and HEALTHCHECK.',
+    talkingPoints: [
+      'The interesting deploy fact: the build context is assembled from three sources - the mcp-engine engine, compute modules, and the app own core.py - then deployed with gcloud run deploy --source, which lets Cloud Build build from source without a local Dockerfile push step.',
+      'core.py is transport-agnostic on purpose: the FastAPI app, the CLI, and the MCP server all call the same compute_verdict() without importing FastAPI or triggering route registration. main.py is a thin HTTP adapter. That is a design decision I can talk about for minutes.',
+      'The Dockerfile is a third container pattern in my estate: mambaorg/micromamba multi-stage with a conda env and a HEALTHCHECK, versus python:3.11-slim single-stage with a non-root user for quotes-api backend, and node:22-alpine multi-stage with Next standalone output for the frontend. Three legitimately different patterns, and I can compare them out loud.',
+    ],
+    evidence: ['ledger-app/deploy-backend.sh', 'ledger-app/backend/cloud-run/Dockerfile', 'ledger-app/backend/core.py'] },
+
+  { id: 'svc-mcp-engine', type: 'service', label: 'mcp-engine',
+    summary: 'Shared analysis engine on Cloud Run: vendor market data in, LLM summaries, Firestore cache. Low error volume compared with the main data API.',
+    talkingPoints: [
+      'This is the shared analysis engine: ledger-app mounts its source tree into the build, and quotes-api calls its compute and scan logic. One engine, three consumers - which is exactly why its deploy script assembling a merged context matters.',
+      'Reliability contrast I can cite: a handful of errors in a month for this service versus the overwhelming share of estate-wide errors coming from data-api. Same platform, very different failure profiles - the difference is upstream vendor waits, not the code.',
+      'Known gap I name first: mcp-engine production runs on uncommitted local state - main does not even import. That is the deploy gap at its worst, and the fix is boring: commit, CI, deploy from main.',
+    ],
+    evidence: ['mcp-engine/cloudbuild.yaml', 'legacy deploy scripts'] },
+
+  { id: 'svc-free-tier-refresh', type: 'service', label: 'free-tier-refresh (Job)',
+    summary: 'Cloud Run Job, not a service: runs to completion, no request timeout, triggered weekly (Mon 09:00) by Cloud Scheduler. deploy-gcp.sh builds via Cloud Build, deploys the job, creates the scheduler. Idempotent, dedicated service account, secrets via Secret Manager.',
+    talkingPoints: [
+      'Job versus service is a clean interview contrast: a service answers requests inside a request deadline; a job runs to completion with no request timeout. The scheduler forensics doc headline fix is moving two long-running HTTP-refresh jobs onto Jobs because they do 100-170s of work against a 180-300s request deadline - 73% and 45% failure rates over 30 days, masked by Scheduler automatic retries.',
+      'Its deploy-gcp.sh is the cleanest deploy pattern in the estate: Cloud Build image, gcloud run jobs deploy, scheduler creation, idempotent, dedicated service account, secrets through Secret Manager. When asked "what good looks like", I describe this script.',
+      'Open flaw I volunteer: it failed 4 of 4 Monday runs at the October audit and stderr was not captured, so root cause is unknown. First check is the env file the job reads; the fix is structured error output so a failure explains itself.',
+    ],
+    evidence: ['news-portal/deploy/free-tier-refresh/deploy-gcp.sh', 'internal estate notes'] },
+
+  { id: 'svc-daily-analysis', type: 'service', label: 'daily-analysis (Function)',
+    summary: 'Cloud Function (2nd gen, so Cloud Run under the hood) triggered by the Pub/Sub topic daily-analysis-trigger, which GitHub Actions publishes. Decouples the cron from a long job.',
+    talkingPoints: [
+      'The pattern: GHA publishes daily-analysis-trigger, Pub/Sub delivers at-least-once to the function. Decoupling the cron from the long job means the scheduler does not care how long the analysis takes.',
+      'At-least-once means duplicates will arrive, so the handler must be idempotent - and I would add a dead-letter topic plus an alert, which is the answer to "what happens if the function fails".',
+      'Second-gen functions run on Cloud Run under the hood, so everything about revisions, concurrency and IAM carries over.',
+    ],
+    evidence: ['quotes-api/.github/workflows/', 'study notes'] },
+
+  // ── Frontends ───────────────────────────────────────────────────────────
+  { id: 'fe-main-site', type: 'frontend', label: 'main-site.com (Next.js 15)',
+    summary: 'Next.js 15 on Vercel. API routes act as a server-side proxy to the Cloud Run backend via BACKEND_URL set in the Vercel dashboard; ISR with revalidate 60s on pages; NEXT_PUBLIC_SITE_URL per deployment domain.',
+    talkingPoints: [
+      'The proxy pattern: browser hits Vercel, Next.js API routes call the Cloud Run backend server-side with BACKEND_URL - so the backend URL and any secrets never reach the browser, and the frontend can add caching and auth in one place.',
+      'ISR with revalidate 60 means pages are statically served and regenerated at most once a minute - the data backend barely feels user traffic, which is how a low-cost backend serves a real product.',
+      'Split-brain I manage deliberately: the same frontend can deploy to Cloud Run with BUILD_STANDALONE=true producing Next standalone output, while Vercel builds get the default output - one Dockerfile arg switches the artifact. Vercel is the production path; Cloud Run is the escape hatch.',
+      'Why Vercel and not AWS: for Next.js, Vercel is best-in-class; the honest AWS port is OpenNext on CloudFront or Amplify Hosting. Knowing why you stay is the senior answer.',
+    ],
+    evidence: ['quotes-api/.env.example', 'project-wiki/deployment-flow.md', 'quotes-api/frontend/Dockerfile'] },
+
+  { id: 'fe-ledger-app', type: 'frontend', label: 'ledger-app web (Next.js 16)',
+    summary: 'Next.js 16 frontend, proxies to ledger-api via BACKEND_URL. Deploy target not evidenced in the repo - likely Vercel, marked UNVERIFIED in the guide.',
+    talkingPoints: [
+      'Same proxy pattern as news-portal: BACKEND_URL server-side, browser never sees the backend address. One pattern, reused - that consistency is deliberate.',
+      'Honest edge-of-knowledge practice: the repo does not evidence where this frontend deploys. The guide marks it UNVERIFIED rather than guessing. In an interview that sentence is "I have not verified that" - which is a stronger move than bluffing.',
+    ],
+    evidence: ['ledger-app/README.md'] },
+
+  { id: 'fe-portal', type: 'frontend', label: 'news-portal (Vercel + Neon)',
+    summary: 'The product portal: Next.js on Vercel, Clerk auth, Neon Postgres as system of record. Nightly GitHub Actions workflow snapshots Neon to SQLite. Fifteen workflows drive its pipelines.',
+    talkingPoints: [
+      'Neon is the system of record - users, paper trading, news - while Firestore is the cache layer for market data. The split is access patterns: relational queries and joins versus key-value cache reads from scale-to-zero containers with no connection pooling to manage.',
+      'Backups are the proven pattern here: a nightly GHA workflow snapshots Neon to SQLite. The recommendation I would repeat elsewhere: schedule the quotes-api Firestore export using this exact pattern, because right now that backup script exists but is manual and unscheduled.',
+      'CI worth bragging about: integration tests create a Neon branch, migrate the schema onto it, run, and delete the branch - real Postgres, no shared state, skipped cleanly on forks without secrets.',
+    ],
+    evidence: ['news-portal/.github/workflows/backup-to-sqlite.yml', 'study notes'] },
+
+  { id: 'fe-static-site', type: 'frontend', label: 'static-site (Netlify static)',
+    summary: 'Static site on Netlify. No GCP footprint at all - eight code searches found no GCP hits. The AWS translation is trivial: S3 plus CloudFront.',
+    talkingPoints: [
+      'The boring end of the spectrum: a static site needs no server, no secrets, no scheduler. Netlify builds on push. The AWS port is S3 plus CloudFront and takes an afternoon.',
+      'Worth naming in a cost conversation: not everything belongs on Cloud Run. Matching the hosting to the workload is itself an architecture skill.',
+    ],
+    evidence: ['internal estate notes'] },
+
+  { id: 'fe-mobile-app', type: 'frontend', label: 'Expo mobile app',
+    summary: 'Expo mobile app. Its only GCP surface is an Identity Platform Google OAuth client, provisioned by Terraform with variables that have no defaults to prevent accidental deploys.',
+    talkingPoints: [
+      'The auth chain: Clerk on the app side, GCP Identity Platform as the Google OAuth provider. The AWS answer is Cognito user pools with a social IdP - or keep Clerk, because the abstraction layer already isolates the choice.',
+      'Small Terraform, real discipline: variables without defaults so nothing deploys by accident. That is the applied-scope end of my IaC, contrasted with the designed-but-not-applied new-pipeline slot.',
+    ],
+    evidence: ['mobile-app/terraform/main.tf'] },
+
+  // ── Datastores ──────────────────────────────────────────────────────────
+  { id: 'ds-firestore', type: 'datastore', label: 'Firestore (quote_cache + price_history)',
+    summary: 'Native-mode Firestore in us-east1. quote_cache is a TTL cache with checkpoints and counters; price_history is permanent, sharded into yearly subcollections to stay under the 1 MiB document cap; industry_cache and analysis_cache beside them.',
+    talkingPoints: [
+      'Why Firestore and not Postgres here: key-value cache access patterns, serverless auth via Application Default Credentials, and no connection pooling to manage from scale-to-zero containers. The cost is no joins or ad-hoc SQL - which is exactly why relational data lives in Neon. That is the honest trade, stated as a trade.',
+      'TTL policies delete by timestamp field, but deletion is eventual - so reads must also check expiry. Same lesson as DynamoDB TTL, which can lag by up to a couple of days. If an interviewer asks "TTL deleted nothing last night, why might that be normal" - this is why.',
+      'Shape decisions I can defend: price_history uses yearly subcollections to keep documents under the 1 MiB cap; sustained writes to a single document are limited to about 1 per second, so counters get sharded rather than hammered; purge-cache is a safety net alongside native TTL and archives to GCS Parquet before deleting.',
+      'Billing is per operation, not per query-time - so a cache that re-reads on every request costs more than one that batches. The backend also has an in-memory LRU layer capped at 256 entries in front of Firestore for hot paths like quotes.',
+      'Open gap: the NDJSON export backup script exists but is manual and unscheduled. The fix is to schedule it via the portal proven nightly GHA pattern.',
+    ],
+    evidence: ['quotes-api/backend/firestore.py', 'quotes-api/backend/price_store.py', 'quotes-api/backend/archiver.py'] },
+
+  { id: 'ds-neon', type: 'datastore', label: 'Neon Postgres',
+    summary: 'Serverless Postgres, system of record for the portal and the fourth pipeline: users, paper trading, news. Not GCP - a separate vendor. The AWS translation is Aurora Serverless v2.',
+    talkingPoints: [
+      'Why a second database vendor: relational data with joins - users, positions, news - does not belong in a document cache. Neon gives serverless Postgres with branching, and branching is what makes the CI pattern possible.',
+      'The CI trick: neondatabase/create-branch-action makes an ephemeral branch per test run, the schema migrates onto it, tests run, the branch is deleted. Real Postgres, zero shared state, and it skips cleanly on forks that lack secrets.',
+      'AWS translation: Aurora Serverless v2, or RDS if you want the plain answer. Serverless Postgres exists on both sides; the choice was about branching and price, not religion.',
+    ],
+    evidence: ['news-portal/.github/workflows/', 'study notes'] },
+
+  { id: 'ds-dynamodb', type: 'datastore', label: 'DynamoDB (lookup tables)',
+    summary: 'The real AWS footprint: six tables in us-east-1 - rate_budget, seen, news_cursor, llm_cache, live_prices, job_locks. Provisioned 18 RCU / 18 WCU total, sized to the permanent free tier. One IAM user, one inline policy, no managed policies, six actions on exactly six table ARNs.',
+    talkingPoints: [
+      'Why DynamoDB at all: it has a permanent free tier with low-latency conditional writes, which suits a rate-limit counter and job locks. It is not a strategic AWS commitment - say that explicitly, then show the design is still careful.',
+      'Least privilege by omission: the policy allows GetItem, PutItem, UpdateItem, BatchGetItem, BatchWriteItem and Query on exactly six table ARNs. No Scan, no DeleteItem, no ListTables. Because the user cannot DeleteItem, locks are released by setting expires_at to 0. A temporary second key proved allowed calls succeed and out-of-policy calls are denied - that verification step is the senior move.',
+      'Three patterns to walk through: rate_budget was an atomic per-minute token counter - UpdateItem with ADD and a condition expression, so two jobs cannot both spend the last token, capped at 190 of a roughly 200-per-minute vendor plan (later removed from source by a cleanup PR). seen_articles is an idempotency pre-filter written after the Neon commit, so a failed commit never loses an article. job_locks is a distributed lock via conditional PutItem with attribute_not_exists.',
+      'TTL is enabled on expires_at for four tables and deliberately off for news_cursor and live_prices, which must persist. TTL deletes are eventual - reads still filter on expires_at.',
+      'What I would admit unprompted: the credential is a long-lived IAM user access key sitting in a Modal secret, not a short-lived role - the upgrade is an IAM role with OIDC federation. Provisioned capacity with no autoscaling throttles under burst; on-demand would be safer at a small premium. And a cross-cloud hop from Modal to AWS adds latency to every rate-limit check.',
+    ],
+    evidence: ['news-portal/docs/aws-modal-pipeline-notes.md', 'study notes'] },
+
+  { id: 'ds-gcs-parquet', type: 'datastore', label: 'GCS Parquet archive',
+    summary: 'purge-cache archives expired Firestore documents to Cloud Storage as Parquet before deleting them. Cache expiry never destroys history.',
+    talkingPoints: [
+      'The design rule: TTL is a cache policy, not a data policy. Anything with historical value is archived to Parquet in GCS before the delete, so storage classes and lifecycle rules - Nearline at 7 days, delete at 30 - apply to the archive, not the source of truth.',
+      'AWS translation is one-to-one: S3 with a lifecycle transition to Standard-IA then Glacier. My 7-day-Nearline, 30-day-delete rule is the same shape as S3 lifecycle.',
+      'The failure question: what happens if the archive succeeds and the delete fails? Nothing - the doc lingers, TTL gets it later. And if the archive fails? The delete must not run. Ordering is the whole design: archive, verify, then delete.',
+    ],
+    evidence: ['quotes-api/backend/archiver.py', 'internal estate notes'] },
+
+  { id: 'ds-artifact-registry', type: 'datastore', label: 'Artifact Registry',
+    summary: 'Container images land in us-central1-docker.pkg.dev under cloud-run-source-deploy. After the September prune: keep the 5 newest images, delete anything older than 30 days. The frontend still pushes to the legacy gcr.io path - an inconsistency to flag yourself.',
+    talkingPoints: [
+      'Registry hygiene is a real cost line: stale revisions pile up as image storage and become a visible share of the monthly bill - until a one-time prune plus a keep-N, delete-after-30-day cleanup policy keeps it fixed.',
+      'The AWS translation is ECR, lifecycle policies included - I already run one, so that answer is a story, not a definition.',
+      'Inconsistency I name first: the frontend still tags gcr.io while backend and backend2 use Artifact Registry, and free-tier-refresh also still tags gcr.io. Standardizing is on the list.',
+    ],
+    evidence: ['internal estate notes', 'quotes-api/backend/cloudbuild.yaml'] },
+
+  { id: 'ds-supabase', type: 'datastore', label: 'Supabase (web-app)',
+    summary: 'web-app has no GCP surface at all: GitHub Actions cron pipelines plus Supabase for storage. Mature GHA patterns live here - sharding, concurrency groups, dry-run gates.',
+    talkingPoints: [
+      'Different product, different shape: a sharded full-universe scan - 954 tickers across 4 shards - runs on GHA cron with workflow_dispatch inputs and dry_run gates, storing to Supabase. No Cloud Run needed.',
+      'The concurrency story: concurrency groups with cancel-in-progress false for pipeline writes, because cancelling a run mid-write is worse than a delay; the opposite choice for CI, where you do want cancellation.',
+      'The translation answer if asked: Supabase is hosted Postgres with an API layer - on AWS that is RDS or Aurora behind API Gateway, and the sharded scan would be EventBridge plus Lambda or Fargate tasks. Different vendor, same shapes as the rest of the estate.',
+    ],
+    evidence: ['web-app/.github/workflows/quotes-scan.yml', 'internal estate notes'] },
+
+  // ── Schedulers and pipeline runners ─────────────────────────────────────
+  { id: 'sch-cloud-scheduler', type: 'scheduler', label: 'Cloud Scheduler (job fleet)',
+    summary: 'The original cron layer: a fleet of enabled jobs, all pointing at data-api endpoints - premarket warmup, bake, intraday, EOD, purge. Three jobs per billing account are free; each beyond that is billed at ten cents. Auth is a shared bearer secret today, OIDC is the direction.',
+    talkingPoints: [
+      'Auth pattern as-built: every job sends Authorization Bearer <shared secret>, validated by the backend. Rotation is a manual three-step dance - new Secret Manager version, update all jobs, redeploy - with a documented silent-401 failure mode. The architecture already references OIDC audience and service-account env vars; IAM-based OIDC invocation is where I want to land.',
+      'The trap question: Scheduler logged 16 of 20 attempts failed with 13 DEADLINE_EXCEEDED while the backend logged 13 times 200. The Scheduler attempt deadline - default about three minutes - is shorter than a slow fetch, so Scheduler gives up while the backend keeps working. Fixes: raise the attempt deadline, return 202 and work asynchronously, or split the fetch.',
+      'At-least-once delivery means handlers must be idempotent - retries are a feature, not a bug. And partial success returning 200 is the silent killer: midday-quotes returned 200 every weekday while 6 of 54 symbols were missing. Success must be defined by the payload, not the status code.',
+      'Known footguns from my own incident log: a missing skip_ai=true query param drained the shared free-tier Gemini quota and caused two days of stale content; a dead job URI means jobs fire silently into the void.',
+      'Cost trivia worth knowing: three jobs per billing account are free, and each beyond that is billed at ten cents per job per month. The consolidation recommendation - many jobs down to one dispatcher - saves the per-job fees and removes moving parts.',
+    ],
+    evidence: ['project-wiki/scheduler-jobs-config.md', 'internal estate notes'] },
+
+  { id: 'sch-gha-cron', type: 'scheduler', label: 'GitHub Actions cron (cutover)',
+    summary: 'Most timed refreshes have moved from Cloud Scheduler to GHA cron calling the same protected endpoints. quotes-api slot1-scheduler.yml maps each cron to job names gated by the SLOT1_GHA_JOBS repo variable - a reversible, zero-deploy migration.',
+    talkingPoints: [
+      'The migration mechanism is the story: each cron maps to job names, and only jobs listed in the repo variable SLOT1_GHA_JOBS run. Cutting a job over from Cloud Scheduler to GHA means adding the name to the variable and pausing the matching Scheduler job. Rollback is the reverse. Reversible, zero-deploy, per-job - that is release engineering.',
+      'GHA cron caveats I can recite: UTC only, minimum interval five minutes, runs can be delayed or dropped under platform load, schedules live on the default branch only, and public repos lose schedules after 60 days of inactivity. Design crons to be safe to miss and safe to run twice.',
+      'The daylight-saving trick: the afternoon pipeline schedules both 20:15 and 19:15 UTC, then a gate job checks the wall-clock hour in America/New_York plus weekday, so the off-season entry is a no-op instead of a duplicate run an hour apart.',
+    ],
+    evidence: ['quotes-api/.github/workflows/slot1-scheduler.yml', 'study notes'] },
+
+  { id: 'sch-modal-tick', type: 'scheduler', label: 'Modal tick (extra pipeline)',
+    summary: 'Modal app news-jobs runs a tick cron every minute and spawns whichever jobs due_jobs() says are due: ingest Alpaca news, score with lexicon plus FinBERT, corroborate with Finnhub, aggregate per ticker, poll live prices, label outcomes, evaluate accuracy.',
+    talkingPoints: [
+      'Why Modal: burst compute for ML scoring - FinBERT - without running a fleet. The one-minute tick is a tiny orchestrator that spawns due jobs; the jobs do the work.',
+      'News enters the confluence score at weight 0 - shadow mode - until measured delta-IC proves it helps. Shipping a signal at weight zero and promoting it on evidence is the answer to "how do you prove a model works before it affects users".',
+      'The rate-budget story lives here: before each Alpaca call, jobs reserved a token from the DynamoDB counter - until a later cleanup PR removed it from source. Say the shared cap is gone and why, rather than presenting it as current. That sentence is what "I keep my story accurate" sounds like.',
+    ],
+    evidence: ['news-portal/docs/aws-modal-pipeline-notes.md', 'study notes'] },
+
+  { id: 'sch-pubsub-trigger', type: 'scheduler', label: 'Pub/Sub daily-analysis-trigger',
+    summary: 'GHA publishes to the daily-analysis-trigger topic; the daily-analysis Cloud Function subscribes. At-least-once delivery, ack deadlines, dead-letter topics, optional ordering keys.',
+    talkingPoints: [
+      'Pub/Sub versus Cloud Tasks is a classic: Pub/Sub is fan-out, Tasks is targeted with rate limiting and per-task retry. Here the decoupling goal - cron fires, long job runs elsewhere - fits Pub/Sub.',
+      'What breaks on duplicate delivery and how you prevent it: idempotent handler keys, and a dead-letter topic plus alert for poison messages. I would add the DLQ; saying what I would add is fine when I say it as such.',
+      'AWS translation: Pub/Sub is SNS and SQS in one service; on AWS you choose fan-out or queue explicitly.',
+    ],
+    evidence: ['study notes'] },
+
+  // ── Concepts: the expert depth ──────────────────────────────────────────
+  { id: 'c-revisions', type: 'concept', label: 'Revisions and rollback',
+    summary: 'Every Cloud Run deploy creates an immutable revision. Rollback is re-pointing traffic, not rebuilding. Traffic can split between revisions for canary.',
+    talkingPoints: [
+      'Immutability is the whole point: a revision is a frozen image plus config, so rollback is a traffic switch measured in seconds, not a rebuild measured in minutes. Traffic splitting between revisions gives you canary deploys for free.',
+      'The cost shadow: revisions keep their images in the registry. dozens of stale revisions were several GiB and a visible share of the bill until pruned - immutability plus hygiene, both halves matter.',
+      'AWS translation: task definition revisions on ECS. Same immutability idea, different names.',
+    ],
+    evidence: ['internal estate notes'] },
+
+  { id: 'c-minscale', type: 'concept', label: 'minScale is a bill, not a setting',
+    summary: 'data-api ran minScale 1: one always-on instance, the large majority of the monthly bill in a modeled cost teardown. Setting min-instances 0 dropped the modeled floor to a few cents a month.',
+    talkingPoints: [
+      'The four-beat answer: min instances keep warm capacity (claim); a warm instance bills continuously under request-based pricing because CPU is allocated (mechanism); in my estate it was most of the spend, and setting it to zero dropped the floor to a few cents (evidence); the trade is 5-15 second cold starts, acceptable because the dominant callers are latency-insensitive schedulers, softened by startup-cpu-boost (trade-off).',
+      'The second-order effect is the senior detail: scaling to zero thinned the timeout margin on two already-marginal scheduler jobs. Every config change has a second-order effect - that sentence alone has won me credibility.',
+      'The follow-up that separates memorized from lived: what would make you turn minScale back on? A user-facing latency SLO on a hot path - the day a user-facing checkout p95 matters, I pay for warmth and call it an insurance premium, with the number written down.',
+    ],
+    evidence: ['internal estate notes'] },
+
+  { id: 'c-scale-to-zero', type: 'concept', label: 'Scale-to-zero and cold starts',
+    summary: 'Cloud Run scales to zero natively; a cold start is 5-15s here, softened by startup-cpu-boost. On AWS, Fargate always runs at least one task; App Runner can pause. This is a real platform difference, not marketing.',
+    talkingPoints: [
+      'The crossover answer: scale-to-zero is native on Cloud Run; on AWS, ECS Fargate always runs at least one task, and App Runner can pause but that is closer to scale-to-one. If the workload is bursty HTTP with long idle gaps, that difference is the bill.',
+      'When cold starts are fine: the dominant caller is a scheduler, not a user. Latency-insensitive callers plus cpu-boost equals a seven-cent floor. When the caller is a user on a checkout page, you pay for min-scale and call it an insurance premium.',
+      'The verify-before-you-say-it habit: cold start numbers move with runtime and image size, so mine are dated - 5 to 15 seconds as of the September audit on python:3.11-slim. If an interviewer presses for current numbers, the honest move is how I would measure: Cloud Logging trace timestamps on cold revisions.',
+    ],
+    evidence: ['internal estate notes'] },
+
+  { id: 'c-set-secrets', type: 'concept', label: '--set-secrets replaces the whole set',
+    summary: 'gcloud run deploy --set-secrets is not additive: it replaces the entire bound set. A secret added by hand in the console disappears on the next deploy that does not name it.',
+    talkingPoints: [
+      'The near-miss: cloudbuild.yaml bound GEMINI_API_KEY but not the hand-added OPENROUTER_API_KEY. The next deploy would have silently dropped OpenRouter. Caught in the September audit by treating the cloudbuild secrets line as a live-config diff against reality.',
+      'Rotation done safely: add a new secret version, deploy a new revision so :latest resolves fresh, verify, disable the old version, destroy it later. Env-var secrets are fixed for the life of an instance - rotation needs a new revision to take effect. Volume-mounted secrets can refresh without one.',
+      'The 401 signature: an OpenRouter 401 in the logs is the exact symptom of a stale or wrong secret value; a Finnhub 401 was the same shape. "Secret changed or never updated, service not redeployed."',
+    ],
+    evidence: ['internal estate notes', 'quotes-api/backend/cloudbuild.yaml'] },
+
+  { id: 'c-oidc-vs-bearer', type: 'concept', label: 'OIDC invocation vs shared bearer secret',
+    summary: 'Cloud Scheduler can attach a Google OIDC token (audience plus service account) instead of a static secret. The backend validates audience and expected SA. AWS default is IAM-signed requests - the direction both clouds agree on.',
+    talkingPoints: [
+      'Today: shared bearer secret validated in-app, with a three-step manual rotation and a silent-401 failure mode. Target: OIDC tokens minted by Scheduler per invocation, audience-checked by the backend - nothing static to leak, nothing to rotate by hand.',
+      'The contrast that lands in an interview: my direction on GCP (OIDC invocation) is the AWS default (IAM-signed SigV4 requests). Saying "the AWS default is where I am migrating to" shows the map in both vocabularies.',
+      'Why the fallback exists: GitHub Actions calls the same endpoints without a Google identity, so the shared secret stays until WIF lands. Every pragmatic compromise should have a named exit.',
+    ],
+    evidence: ['quotes-api/backend/cloudbuild.yaml', 'project-wiki/scheduler-jobs-config.md'] },
+
+  { id: 'c-concurrency', type: 'concept', label: 'Concurrency 80, and when to tune it down',
+    summary: 'Cloud Run default is 80 requests per instance. One CPU-bound Python request can starve the rest. Combined with max instances, concurrency sets real capacity under load.',
+    talkingPoints: [
+      'The 503 mechanism: a burst of /quotes calls waited on a rate-limited vendor, instances saturated waiting on upstream, and the max-5 cap meant no more capacity. Concurrency times max instances is your real ceiling - 400 requests in flight, all blocked on one vendor.',
+      'For CPU-heavy handlers you tune concurrency down so one heavy request does not starve 79 others; for IO-bound proxies you can leave it high. The default is a starting point, not an answer.',
+      'The nuance worth adding: concurrency and max instances multiply, so capacity planning is arithmetic, not vibes - 80 times 5 is 400 in-flight requests, and if each waits 2 seconds on a vendor, that is 200 vendor requests per second against a rate limit. The math explains the 503s before any log is opened.',
+    ],
+    evidence: ['study notes'] },
+
+  { id: 'c-attempt-deadline', type: 'concept', label: 'Scheduler attempt deadline vs backend work',
+    summary: 'The Scheduler HTTP attempt deadline (default roughly 3 minutes) can be shorter than slow backend work. Scheduler records DEADLINE_EXCEEDED and retries while the backend returns 200 and keeps working.',
+    talkingPoints: [
+      'The evidence pair: Scheduler logs said 16 of 20 attempts failed, 13 DEADLINE_EXCEEDED; the backend logged 13 times 200, 7 times 504, once 503. Both logs are true - they are measuring different things. Reading two logs against each other is the debugging skill.',
+      'Three fixes, ordered: return 202 and do the work asynchronously (Cloud Tasks or a Cloud Run Job) - the real fix; raise the attempt deadline - the quick fix; split the fetch into chunks - the workaround. Retry on a non-idempotent handler makes it worse, so idempotency comes first.',
+      'The general principle I would state: in any caller-callee pair, write down who gives up first. Scheduler attempt deadline versus Cloud Run request timeout versus the vendor client timeout - if those three numbers are not ordered deliberately, the system invents its own order and it will surprise you.',
+    ],
+    evidence: ['internal estate notes', 'study notes'] },
+
+  { id: 'c-ttl-eventual', type: 'concept', label: 'TTL deletes are eventual',
+    summary: 'Firestore TTL and DynamoDB TTL both delete lazily. DynamoDB TTL can lag by up to a couple of days. Reads must filter on the expiry field themselves.',
+    talkingPoints: [
+      'The invariant: TTL is a storage reclamation policy, not a correctness mechanism. If a read path trusts TTL for freshness, stale data will be served. Every read filters on expires_at; TTL is the cleanup crew.',
+      'Why TTL is still worth it: self-cleaning state means no purge job to babysit for the common case. Purge-cache exists as a safety net, archives to Parquet, then deletes - belt and suspenders by design.',
+      'A second shared trap worth naming: neither Firestore nor DynamoDB TTL is a compliance deletion mechanism. If data must be gone by a deadline, you delete it explicitly and use TTL as the backstop - the same archive-then-delete ordering as the Parquet pattern.',
+    ],
+    evidence: ['study notes', 'quotes-api/backend/firestore.py'] },
+
+  { id: 'c-idempotency', type: 'concept', label: 'Idempotency and at-least-once delivery',
+    summary: 'Scheduler retries, Pub/Sub at-least-once, GHA re-runs: every trigger can fire twice. Handlers must be safe to replay - conditional writes, idempotency keys, payload-defined success.',
+    talkingPoints: [
+      'Concrete mechanisms I run: DynamoDB conditional PutItem with attribute_not_exists for job locks; UpdateItem with ADD plus a condition expression for the rate budget so two jobs cannot spend the last token; seen_articles written after the Neon commit so a failed commit never loses an article.',
+      'The vocabulary upgrade: it retries becomes at-least-once delivery, so the handler is idempotent. Say the mechanism, not the hope.',
+      'Failure taxonomy: it broke becomes it degraded - success status with partial payload. midday-quotes is my canonical example; success keyed on coverage, not status code, is the fix.',
+    ],
+    evidence: ['study notes', 'quotes-api/backend/feed_refresh.py'] },
+
+  { id: 'c-wif', type: 'concept', label: 'Workload Identity Federation (keyless CI auth)',
+    summary: 'GHA requests a short-lived OIDC token (permissions id-token: write); GCP WIF or AWS sts AssumeRoleWithWebIdentity exchanges it for temporary credentials. No stored cloud keys.',
+    talkingPoints: [
+      'The mechanism: the runner proves its identity to GitHub, GitHub signs an OIDC token, the cloud provider trusts token.actions.githubusercontent.com via a configured pool or OIDC provider, and STS mints short-lived credentials. No JSON key ever exists, so nothing can leak.',
+      'Why it is my number-three recommendation: the estate still has a long-lived SA key in CI - the same pattern that caused a credential-exposure incident once. Migrate to workload identity federation, then delete the key.',
+      'Both vocabularies: GCP Workload Identity Federation equals AWS IAM OIDC identity provider plus role. Same pattern, same win.',
+    ],
+    evidence: ['news-portal/docs/new-slot-terraform.md', 'quotes-api/.github/workflows/feed-jobs.yml'] },
+
+  { id: 'c-request-vs-instance-billing', type: 'concept', label: 'Request-based vs instance-based billing',
+    summary: 'Request-based: CPU only while handling requests, background work throttled after response. Instance-based: CPU always allocated, background work allowed, always billed.',
+    talkingPoints: [
+      'When it matters: if a handler kicks off background work after responding - cache warming, exports - request-based billing throttles that CPU. Either move the work to a job, or pay instance-based and admit it.',
+      'This is the quiet cousin of the minScale story: both are "you pay for warmth". The estate runs request-based with scale-to-zero because the workload is scheduler-driven.',
+      'The exam-style answer: request-based suits spiky request-driven work; instance-based suits steady load or background processing. My estate is scheduler-driven bursts into a cache, so request-based with scale-to-zero wins - and the day I add websocket streams or workers, that decision gets revisited line by line.',
+    ],
+    evidence: ['study notes'] },
+
+  { id: 'c-deploy-gap', type: 'concept', label: 'The deploy gap: merged is not live',
+    summary: 'No build triggers anywhere: deploys are manual gcloud builds submit. At one audit, production ran a months-old image with three merged PRs undeployed, and a config-only redeploy masked it.',
+    talkingPoints: [
+      'The story: three PRs merged, production unchanged for weeks, and a config-only redeploy made it look fresh. The recurring failure mode across the estate is not bad code - it is code that never shipped. mcp-engine main not even importing is the same disease.',
+      'The fix, stated as a plan: Cloud Build trigger or GHA deploy-on-merge for data-api, using WIF not a key, plus a "deployed? Y/N" line on every PR. Boring, mechanical, and the single highest-leverage reliability change.',
+      'Interview framing: name your own weakness first. "Here is the gap and the migration path" reads senior; hiding it and getting found out does not.',
+    ],
+    evidence: ['internal estate notes'] },
+
+  // ── Incidents and audits: failure-mode fluency ──────────────────────────
+  { id: 'i-minscale-bill', type: 'incident', label: 'minScale was most of the bill',
+    summary: 'Cost teardown: modeled the monthly bill from config and usage, then compared it with observed spend. The four buckets - idle min-instance, stale revisions, secret versions, over-free scheduler jobs - each got a fix. Post-fix floor near zero.',
+    talkingPoints: [
+      'How the audit worked: modeled the bill from config and usage, compared against observed spend, attributed every line. The four buckets - idle min-instance, stale revisions, secret versions, over-free scheduler jobs - each got a fix, not a shrug.',
+      'The recommendation that came out of it: enable BigQuery billing export so the next audit reads real SKUs instead of a model. Measurement infrastructure is a deliverable.',
+      'What I would do differently: the minScale choice was reasonable when made and silently became the majority of the bill as traffic patterns changed. Config decisions need expiry dates - a quarterly cost review would have caught it a year earlier, which is why the audit exists now.',
+    ],
+    evidence: ['internal estate notes'] },
+
+  { id: 'i-stale-revisions', type: 'incident', label: 'Stale revisions pruned',
+    summary: 'Dozens of stale data-api revisions, several GiB of images. Pruned to the newest few revisions plus a keep-N, delete-after-30-day Artifact Registry cleanup policy so it stays fixed.',
+    talkingPoints: [
+      'The fix has two halves: prune once, then set the lifecycle policy so the problem cannot regrow. A one-time cleanup without a policy is a chore; with a policy it is closed.',
+      'This is the cost shadow of revision immutability - the same feature that makes rollback instant makes storage grow forever. Every feature interview answer should name its shadow.',
+      'The interview version of the lesson: every immutability feature needs a retention policy shipped with it - revisions, images, secret versions, log buckets. I now treat \'where does this accumulate\' as a launch question, not a cleanup question.',
+    ],
+    evidence: ['internal estate notes'] },
+
+  { id: 'i-skip-gemini', type: 'incident', label: 'Missing ?skip_ai=true drained quota',
+    summary: 'Intraday scheduler jobs missing the skip_ai=true query param ran the AI bake against the shared free-tier Gemini quota. Two days of stale content before it was traced.',
+    talkingPoints: [
+      'The class of bug: a default parameter with an expensive side effect. Intraday refreshes should never touch the LLM; one missing query param and the free tier is gone, and the failure surface is stale content, not an error - the worst kind.',
+      'The guardrail thinking: defaults should be safe for the most frequent caller. If intraday is the common case, skipping the bake should be the default and opting in should be explicit.',
+      'The detection gap: two days of stale content means nothing was watching freshness. The fix pattern repeats everywhere in my estate - a freshness-check workflow that fails loudly, because stale data with green dashboards is the worst failure mode.',
+    ],
+    evidence: ['incident notes', 'internal estate notes'] },
+
+  { id: 'i-sectors-dns', type: 'incident', label: 'a portal subdomain silent 404',
+    summary: 'Domain attached in Vercel but no Cloudflare DNS record existed. Domain attach without DNS is a silent 404 - the dashboard says connected, the internet says nothing.',
+    talkingPoints: [
+      'The lesson: two-system setups fail in the gap between them. Vercel said attached, Cloudflare had no record, and nobody got paged because nothing errored - it just 404d.',
+      'The general practice: any change that spans two consoles gets an end-to-end check from the outside - one curl from off-network beats two green dashboards.',
+      'The process fix that came out of it: domain changes get a checklist - attach in Vercel, add the DNS record in Cloudflare, then verify from off-network with curl. Three steps, written down, because the gap between two consoles is where this class of bug lives.',
+    ],
+    evidence: ['internal estate notes'] },
+
+  { id: 'i-billing-outage', type: 'incident', label: 'Billing outage took Cloud Run down',
+    summary: 'Billing disabled returned 503s while Cloud Run said Ready. Two days down. The GHA tracker-feed workflow ran feed_refresh.py directly in the runner and wrote straight to Firestore, so data kept flowing.',
+    talkingPoints: [
+      'The failover design is the story: three independent producers, staggered - Cloud Scheduler 22:00 UTC, GitHub Actions 23:00, Modal 23:30. When Cloud Run died, GHA carried the product because feed_refresh.py was written to run anywhere with ADC and write Firestore directly. Redundancy you designed beats redundancy you hoped for.',
+      'The subtle failure mode: 503s while the console says Ready, because billing state is not service state. Status dashboards measure the platform, not your account.',
+      'The deeper design point: feed_refresh.py was written to run anywhere - in the backend, in a GHA runner, on Modal - because it only needs Application Default Credentials and Firestore. Portability written into the code is what made the failover free when the outage arrived.',
+    ],
+    evidence: ['quotes-api/backend/feed_refresh.py', 'study notes'] },
+
+  { id: 'i-deadline-mismatch', type: 'incident', label: '16/20 DEADLINE_EXCEEDED vs 13x 200',
+    summary: '/refresh/run: Scheduler logged 16 of 20 attempts failed (13 DEADLINE_EXCEEDED) while the backend logged 13 x 200, 7 x 504, 1 x 503. Two true logs measuring different things (from a log audit).',
+    talkingPoints: [
+      'Walk the timeline out loud: Scheduler fires, backend starts a slow fetch, attempt deadline passes, Scheduler records DEADLINE_EXCEEDED and retries, backend finishes the first attempt with a 200 nobody is listening to, and the retry doubles the upstream load. Retry amplification on a slow endpoint.',
+      'The fix I would defend: return 202 immediately and run the fetch as a Cloud Run Job, or chunk the fetch. Raising the deadline treats the symptom.',
+      'What made it diagnosable at all: structured JSON logs on the backend and AttemptFinished logs on the Scheduler side. The audit came from reading two log streams against each other - observability you set up before the incident is the only kind that helps during one.',
+    ],
+    evidence: ['internal estate notes'] },
+
+  { id: 'i-midday-quotes-200', type: 'incident', label: 'midday-quotes: 200 with 6 of 54 missing',
+    summary: 'The midday yfinance job returned 200 every weekday while 6 of 54 symbols were missing, so Scheduler counted success. Success must be defined by the payload, not the status code.',
+    talkingPoints: [
+      'The sentence: it degraded - success status with partial payload. Monitoring that watches status codes will sleep through this every time.',
+      'The fix: key success on coverage - feed_refresh.py now exits non-zero when fewer than 90% of tracked symbols reached the expected trading day, so a green run means the data is current, not merely that the job executed. 0.9 tolerates five stragglers - a delisting, a vendor gap - while failing loudly on a wholesale stall.',
+      'Bonus gap found by tracing write to read to UI: a MiddayQuotes component that is never imported - a job writing data nothing reads. Unused jobs burn quota and hide real failures.',
+    ],
+    evidence: ['quotes-api/backend/feed_refresh.py', 'study notes'] },
+
+  { id: 'i-static-sa-key', type: 'incident', label: 'Static service-account key in CI',
+    summary: 'A CI workflow authenticates with credentials_json: secrets.GCP_SA_KEY - a long-lived service-account key in repo secrets. The same pattern caused a credential-exposure incident once; rotation runbooks exist because rotation is painful.',
+    talkingPoints: [
+      'The one-sentence version: that step uses a long-lived key; the right fix is Workload Identity Federation with id-token write; the provisioning path is designed, it is the next hardening item.',
+      'Why I take it seriously: this exact pattern already burned me once, and the rotation runbooks exist because rotation is painful. Delete the key class, not the key.',
+      'The honest timeline answer: the WIF migration is designed in the new-pipeline Terraform docs - pool, provider, binding - and deliberately not applied yet. In an interview I would rather show a designed-but-verified migration path than claim a finished one.',
+    ],
+    evidence: ['quotes-api/.github/workflows/feed-jobs.yml', 'news-portal/docs/new-slot-terraform.md'] },
+
+  { id: 'i-idor-authorization', type: 'incident', label: 'IDOR: derive customer id server-side',
+    summary: 'IDOR is an authorization gap, not an authentication gap - a logged-in user asking for another customer\'s billing session. The fix is deriving the customer id from the auth session server-side, never from a client-supplied parameter.',
+    talkingPoints: [
+      'The class of bug: IDOR is an authorization gap, not an authentication gap. The endpoint checks that you are logged in, then trusts the customer id you handed it. The fix is deriving identity server-side from the session, every time.',
+      'How to talk about an open security question: name the verification step. "Whether the vulnerable shape shipped is unverified; one request against the deployed backend answers it, and the fix is the same either way." Open questions with a named next step read as control, not confusion.',
+      'The broader practice: review findings in uncommitted trees still count - the tree is what deploys when someone runs gcloud run deploy --source from a dirty checkout. Which loops back to the deploy gap.',
+    ],
+    evidence: ['generic code-review notes'] },
+
+  { id: 'i-free-model-failures', type: 'incident', label: 'free-tier-refresh: 4 of 4 Mondays failed',
+    summary: 'Weekly job exited 1 four Mondays in a row at the October audit, and stderr was not captured - so root cause is unknown. First check: the env file the job reads.',
+    talkingPoints: [
+      'The meta-lesson: a failure you cannot explain is an observability gap before it is a bug. Add structured error output so a failure explains itself; then fix what it says.',
+      'Saying it in three sentences: the job failed four of four runs. Stderr was not captured, so root cause is unknown. First check is the env file; the durable fix is error output that explains itself. Stop. Do not apologize, do not ramble.',
+      'The prioritization answer: it is a weekly job feeding a fallback model chain, so the blast radius was small - but four consecutive red Mondays is exactly how alert fatigue starts. Either fix it or silence it deliberately; a cron that is always red trains you to ignore red.',
+    ],
+    evidence: ['study notes'] },
+
+  { id: 'i-thundering-herd-429', type: 'incident', label: 'Cold-cache thundering herd 429s',
+    summary: 'After a cache purge, a burst of requests hit the rate-limited vendor simultaneously; vendor 429s cascaded into Cloud Run 503s against the max-5 instance cap.',
+    talkingPoints: [
+      'The mechanism chain: cache purge, concurrent misses, every instance fetches upstream at once, vendor rate-limits, instances block waiting, pool saturates at the cap, 503s. Each link is reasonable; the chain is the incident.',
+      'Mitigations worth naming: the in-memory LRU in front of Firestore for hot paths, request coalescing so one miss fetches and the rest wait, and backoff with jitter upstream. Any one of them breaks the chain.',
+      'The prevention I would build next: stale-while-revalidate on hot cache keys, so a purge never produces a simultaneous miss storm - one request revalidates, the rest serve slightly stale data. Slightly stale beats down.',
+    ],
+    evidence: ['internal estate notes', 'quotes-api/backend/firestore.py'] },
+
+  // ── AWS translations: every GCP/Vercel thing said in AWS ────────────────
+  { id: 'aws-fargate', type: 'aws', label: 'App Runner / ECS Fargate',
+    summary: 'The Cloud Run translation. App Runner is closest (container to URL, can pause); Fargate behind an ALB is the standard answer but always runs at least one task.',
+    talkingPoints: [
+      'What transfers: container in, HTTPS URL out, per-use billing. What differs: scale-to-zero is native on Cloud Run; Fargate always runs one task, so the floor cost differs - the minScale story does not even exist on Fargate because there is no zero.',
+      'Revisions map to task definition revisions; rollback is re-pointing the service at an older task definition. Same immutability, same traffic-switch rollback.',
+    ],
+    evidence: ['internal estate notes'] },
+
+  { id: 'aws-eventbridge', type: 'aws', label: 'EventBridge Scheduler',
+    summary: 'The Cloud Scheduler translation: cron plus target plus retries. Charges per invocation - the GCP three-free-jobs pricing quirk does not exist.',
+    talkingPoints: [
+      'The pairing shape: managed cron to an HTTP, queue, or Lambda target with retry config and deadlines - same mental model both clouds.',
+      'The auth contrast that lands: my Scheduler bearer secret migrating to OIDC is the AWS default - EventBridge to API Gateway or Lambda is IAM-signed from day one.',
+    ],
+    evidence: ['internal estate notes'] },
+
+  { id: 'aws-codebuild', type: 'aws', label: 'CodeBuild (+ CodePipeline)',
+    summary: 'cloudbuild.yaml translates to buildspec.yml. CodeBuild pairs with CodePipeline and CodeDeploy for the trigger layer my GCP setup is missing.',
+    talkingPoints: [
+      'Both are per-repo YAML build definitions running steps in containers. The honest comparison: neither gives you triggers by itself - my GCP gap is no build triggers, and the AWS answer would be CodePipeline wiring. The fix is the same shape on both clouds.',
+    ],
+    evidence: ['internal estate notes'] },
+
+  { id: 'aws-ecr', type: 'aws', label: 'ECR',
+    summary: 'The Artifact Registry translation. Lifecycle policies exist on both - the keep-5, delete-30-day rule I run ports directly.',
+    talkingPoints: [
+      'One-liner: image registry with lifecycle policies; my keep-5, delete-30-day rule is the same config on ECR. The 62-stale-revisions story is portable evidence that I have run registry hygiene for real.',
+    ],
+    evidence: ['internal estate notes'] },
+
+  { id: 'aws-secrets-manager', type: 'aws', label: 'Secrets Manager',
+    summary: 'The Secret Manager translation: versions, references-not-plaintext, IAM-controlled access. AWS bills per secret-month plus per 10k calls.',
+    talkingPoints: [
+      'Same discipline both sides: reference secrets at deploy, never plaintext env. My rotation dance - new version, new revision, verify, disable old, destroy later - is the AWS rotation story too, except AWS can automate rotation with Lambda.',
+      'Cost nuance: AWS bills per secret-month and per 10k API calls, which is why the GCP audit line "secret versions were 8% of the bill" translates into a hygiene habit, not a surprise.',
+    ],
+    evidence: ['internal estate notes', 'study notes'] },
+
+  { id: 'aws-dynamodb-x', type: 'aws', label: 'DynamoDB (as Firestore translation)',
+    summary: 'The Firestore translation - and also my real AWS footprint (see the DynamoDB tables). Document model, per-op pricing, TTL as a first-class attribute.',
+    talkingPoints: [
+      'The cache-first design ports directly: document model, per-operation pricing, TTL expiry. Firestore TTL and DynamoDB TTL share the same trap - deletes are eventual, reads must filter.',
+      'RCU/WCU math for the capacity question: one RCU is a strongly consistent read up to 4 KB per second; one WCU is a write up to 1 KB per second. 150 two-KB writes per second is 300 WCU - on-demand, or provisioned with headroom.',
+    ],
+    evidence: ['study notes', 'internal estate notes'] },
+
+  { id: 'aws-s3', type: 'aws', label: 'S3 (+ lifecycle)',
+    summary: 'The Cloud Storage translation: strong read-after-write consistency, storage classes, lifecycle rules, presigned URLs, versioning, block-public-access.',
+    talkingPoints: [
+      'My 7-day-Nearline, 30-day-delete rule on the Parquet archive is S3 lifecycle to Standard-IA then Glacier - same policy, different names.',
+      'The static-site answer: Netlify or a bucket website translates to S3 plus CloudFront; static-site would move in an afternoon.',
+    ],
+    evidence: ['internal estate notes', 'study notes'] },
+
+  { id: 'aws-sns-sqs', type: 'aws', label: 'SNS / SQS',
+    summary: 'The Pub/Sub translation: Pub/Sub is fan-out and queue in one service; on AWS you choose SNS for fan-out, SQS for queues (visibility timeout, DLQ).',
+    talkingPoints: [
+      'The decision framing: Pub/Sub collapses the choice; AWS makes it explicit. Fan-out to many consumers is SNS; work-queue semantics with visibility timeout and dead-letter queue is SQS. My daily-analysis-trigger maps to SNS.',
+    ],
+    evidence: ['study notes'] },
+
+  { id: 'aws-lambda', type: 'aws', label: 'Lambda',
+    summary: 'The Cloud Functions translation: event sources off topics and queues, 15-minute cap, cold starts, concurrency limits.',
+    talkingPoints: [
+      'Direct mapping, including event triggers off SNS and SQS. The 15-minute cap is the constraint that shapes designs - my long-running refresh work moving to Cloud Run Jobs would become ECS scheduled tasks, not Lambda.',
+    ],
+    evidence: ['study notes'] },
+
+  { id: 'aws-iam-oidc', type: 'aws', label: 'IAM OIDC provider for GitHub Actions',
+    summary: 'The WIF translation: GitHub signs an OIDC token, AWS trusts token.actions.githubusercontent.com, sts AssumeRoleWithWebIdentity returns temporary credentials. No stored keys.',
+    talkingPoints: [
+      'Same pattern as GCP WIF, same win: keyless CI auth. The trust policy says who may assume the role - scoped to repo and branch; the permissions policy says what they may do.',
+      'IAM evaluation in one breath: explicit deny beats allow, default is deny; identity policies, resource policies, permission boundaries, SCPs. The confused-deputy fix is aws:SourceArn and aws:SourceAccount conditions.',
+    ],
+    evidence: ['study notes', 'internal estate notes'] },
+
+  { id: 'aws-cloudwatch', type: 'aws', label: 'CloudWatch (+ CloudTrail)',
+    summary: 'The Cloud Logging and Monitoring translation: logs, metrics, alarms to SNS. CloudTrail is the audit log - who did what.',
+    talkingPoints: [
+      'My three alert policies on scheduler failures are CloudWatch alarms to SNS on the other side. The four golden signals - latency, traffic, errors, saturation - are vocabulary that works in any cloud.',
+    ],
+    evidence: ['internal estate notes', 'study notes'] },
+
+  { id: 'aws-cognito', type: 'aws', label: 'Cognito',
+    summary: 'The Identity Platform translation: user pools plus social IdP federation. The honest answer is "Cognito - or keep Clerk", because the app already abstracts the provider.',
+    talkingPoints: [
+      'The mobile auth chain - Clerk in front, Identity Platform as Google OAuth behind - becomes Clerk in front of Cognito, or Clerk alone. Abstraction layers exist so this answer can be short.',
+    ],
+    evidence: ['internal estate notes'] },
+
+  { id: 'aws-aurora', type: 'aws', label: 'Aurora Serverless v2',
+    summary: 'The Neon Postgres translation: serverless Postgres on AWS, or plain RDS. Serverless Postgres exists on both sides; the choice is branching and price.',
+    talkingPoints: [
+      'What I would actually miss from Neon is branching - the ephemeral database per CI run. Aurora clones get you partway; the workflow would need rebuilding. A translation table that includes what does not translate is the honest one.',
+    ],
+    evidence: ['internal estate notes'] },
+
+  // ── GitHub Actions patterns ─────────────────────────────────────────────
+  { id: 'gha-dual-cron', type: 'gha', label: 'Dual cron + wall-clock gate (DST)',
+    summary: 'GitHub cron is UTC only. The afternoon pipeline schedules 20:15 and 19:15 UTC, then a gate job checks the hour in America/New_York and weekday, so the off-season entry no-ops instead of duplicating an hour apart.',
+    talkingPoints: [
+      'The problem: "3:15 pm New York year-round" is two different UTC times depending on the season. Two cron entries plus a wall-clock gate in the runner solves it with zero external state.',
+      'The general principle: make the wrong run harmless rather than trying to make the schedule perfect. Idempotent, gated, safe to run twice.',
+    ],
+    evidence: ['study notes'] },
+
+  { id: 'gha-slot1-flag', type: 'gha', label: 'Feature-flag cutover via repo variable',
+    summary: 'slot1-scheduler.yml maps each cron to job names and runs only those in the SLOT1_GHA_JOBS repo variable. Cutover from Cloud Scheduler = add the name, pause the old job. Rollback is the reverse. Zero deploy.',
+    talkingPoints: [
+      'Why this is a strong story: it is a reversible migration mechanism, not a big-bang rewrite. Per-job cutover, instant rollback, and the flag lives in repo config so it is auditable and changeable without a code change.',
+      'The verify step I run before quoting it: gh variable list shows SLOT1_GHA_JOBS with the current comma list; gh run list --workflow slot1-scheduler.yml shows recent status.',
+    ],
+    evidence: ['quotes-api/.github/workflows/slot1-scheduler.yml', 'study notes'] },
+
+  { id: 'gha-concurrency', type: 'gha', label: 'Concurrency groups: cancel vs queue',
+    summary: 'concurrency group afternoon-pipeline with cancel-in-progress false: finish the in-flight run and queue the next. For CI the opposite - cancel stale runs.',
+    talkingPoints: [
+      'The reasoning: cancelling a pipeline run that is mid-write is worse than a delay; data pipelines queue, CI cancels. The setting follows the blast radius of interruption.',
+    ],
+    evidence: ['study notes'] },
+
+  { id: 'gha-fail-loud', type: 'gha', label: 'Fail loudly into an issue',
+    summary: 'On scheduled failure, the workflow runs gh issue create --label pipeline-failure with the run URL. A cron that fails silently is the real outage.',
+    talkingPoints: [
+      'The sentence: scheduled jobs have no human watching; the failure notification IS the monitoring. Least-privilege permissions make it safe - default contents read, and only the notify job elevates to issues write.',
+      'Pairs with payload-defined success: the midday-quotes lesson applied to CI itself.',
+    ],
+    evidence: ['study notes'] },
+
+  { id: 'gha-neon-branch', type: 'gha', label: 'Ephemeral Neon branch per test run',
+    summary: 'Integration tests create a Neon branch, migrate the schema, run, and delete the branch - neondatabase create-branch-action and delete-branch-action. Real Postgres, no shared state, skips cleanly on forks.',
+    talkingPoints: [
+      'Why it matters: shared test databases are where CI flakes are born. Branch-per-run is hermetic Postgres at no extra infrastructure cost - the branching feature doing real work.',
+      'The fork detail: steps are gated so forks without secrets skip cleanly instead of failing red. Respecting the contributor experience is a design choice too.',
+    ],
+    evidence: ['news-portal/.github/workflows/', 'study notes'] },
+
+  { id: 'gha-bot-prs', type: 'gha', label: 'Bot-authored PRs for data refreshes',
+    summary: 'peter-evans/create-pull-request opens a PR when the free-model chain changes, so automated config changes are reviewed, not silently committed.',
+    talkingPoints: [
+      'The principle: automation may propose, humans dispose. A data refresh that changes config opens a PR; the review habit survives the automation.',
+    ],
+    evidence: ['study notes'] },
+
+  { id: 'gha-staggered', type: 'gha', label: 'Redundant producers, staggered',
+    summary: 'The industry tracker feed has three independent producers: Cloud Scheduler 22:00 UTC, GHA 23:00 UTC, Modal 23:30 UTC. Any one can carry the product; a two-day billing outage proved it.',
+    talkingPoints: [
+      'Why staggered and not simultaneous: one vendor-bad day is not hit three times at once, and the later runs can repair the earlier run gaps.',
+      'The proof point: when billing took Cloud Run down for two days, GHA ran feed_refresh.py directly in the runner and wrote straight to Firestore. The redundancy was designed, then it was tested by reality.',
+    ],
+    evidence: ['quotes-api/backend/feed_refresh.py', 'study notes'] },
+
+  { id: 'gha-oidc', type: 'gha', label: 'permissions: id-token write (keyless cloud auth)',
+    summary: 'A job with permissions id-token: write can request a short-lived OIDC token and exchange it for cloud credentials via WIF or AssumeRoleWithWebIdentity. This is the escape hatch from stored keys.',
+    talkingPoints: [
+      'The full chain, both clouds: GITHUB_TOKEN is per-run and scoped by permissions; id-token write lets the job mint an OIDC token; the cloud exchanges it for short-lived credentials. No stored cloud keys anywhere in the loop.',
+      'Security hygiene around it: pin third-party actions to a commit SHA not a mutable tag; never run untrusted PR code with secrets - pull_request_target is the classic footgun; secrets are masked in logs but a step that echoes a transformed secret can leak it.',
+    ],
+    evidence: ['study notes'] },
+
+  { id: 'gha-cron-caveats', type: 'gha', label: 'Scheduled-workflow caveats',
+    summary: 'UTC only; 5-minute minimum interval; runs can be delayed or dropped under platform load; schedules live on the default branch; public repos lose schedules after 60 days idle. Design crons safe to miss and safe to run twice.',
+    talkingPoints: [
+      'The design consequence: a cron that must not be missed needs a catch-up mechanism - my jobs check what data is due rather than assuming the last run happened. due_jobs() on the Modal tick is exactly that pattern.',
+    ],
+    evidence: ['study notes'] },
+
+  // ── Practice wing: live coding and debugging in Python ──────────────────
+  // Each exercise is grounded in a real file from quotes-api or ledger-app.
+  // Fields: prompt (the task), files (real repo paths), timeboxMin,
+  // skills (what it trains), twists (debugging turns to add live).
+  { id: 'x-run-budget', type: 'exercise', label: 'Rep: extend RunBudget (dataclasses)',
+    summary: 'Live-coding rep on quotes-api backend/llm/budget.py: a 20-line RunBudget dataclass that gates LLM calls per run. Extend it without breaking the existing contract.',
+    prompt: 'Add per-model cost accounting to RunBudget: track calls and estimated USD per model (use the price table in backend/llm/pricing.py), add a max_usd cap alongside max_llm_calls_per_run, and keep can_spend()/spend() backward compatible. Write the tests first.',
+    files: ['quotes-api/backend/llm/budget.py', 'quotes-api/backend/llm/pricing.py'],
+    timeboxMin: 20,
+    skills: ['dataclasses', 'backward-compatible API change', 'test-first under time pressure'],
+    twists: [
+      'Interviewer seeds a bug: can_spend() uses <= instead of <, allowing one call over budget. Find it, write the failing test, fix it.',
+      'spend() returns False without recording why. Add a reason field or logging without changing the return contract.',
+      'Make RunBudget thread-safe enough for asyncio.gather callers - discuss whether a lock is even needed for += on an int in CPython, and when it would be.',
+    ],
+    talkingPoints: [
+      'Why this file is good rep material: it is the exact shape of take-home code - a small stateful object with a money-adjacent contract. The interview skill is narrating invariants out loud while editing: calls_used never exceeds max, spend is atomic from the caller view.',
+    ],
+    evidence: ['quotes-api/backend/llm/budget.py', 'quotes-api/backend/llm/pricing.py'] },
+
+  { id: 'x-mem-cache', type: 'exercise', label: 'Rep: FIFO to LRU (mem cache)',
+    summary: 'Debugging rep on quotes-api backend/firestore.py: mem_get/mem_set are a 256-entry in-memory cache in front of Firestore. It is FIFO (dict insertion order), not LRU - upgrade it and prove staleness behavior.',
+    prompt: 'Convert _MEM_CACHE from FIFO eviction to true LRU: a get must refresh recency. Use OrderedDict or dict plus move_to_end. Preserve the max_age staleness check and the 256 cap. Then write tests: hit refreshes recency, eviction picks the least-recently-used, expired entries miss.',
+    files: ['quotes-api/backend/firestore.py'],
+    timeboxMin: 25,
+    skills: ['cache semantics', 'OrderedDict / dict ordering', 'time.monotonic vs time.time', 'eviction edge cases'],
+    twists: [
+      'Bug seed: mem_set on an existing key does not refresh its timestamp, so a hot key can serve a value older than max_age. Reproduce with a test, then fix.',
+      'The clock question: why monotonic and not time.time for age checks? (NTP jumps.) What breaks if you swap them?',
+      'Concurrency: two asyncio tasks set the same key - what is the worst case, and is it acceptable for a cache? Say why out loud.',
+    ],
+    talkingPoints: [
+      'The production context sells the rep: this cache eliminates Firestore reads on hot quote paths, and Firestore bills per operation - eviction policy is a cost decision, not just a CS exercise.',
+    ],
+    evidence: ['quotes-api/backend/firestore.py'] },
+
+  { id: 'x-feed-freshness', type: 'exercise', label: 'Rep: expected_last_date (calendars)',
+    summary: 'Live-coding rep on quotes-api backend/feed_refresh.py: expected_last_date(now) returns the newest trading day whose daily bar should be settled. Weekends, holidays, and the 22:30 UTC settle line make it a real edge-case workout.',
+    prompt: 'Without looking at the implementation, write expected_last_date(now) given is_trading_day(day) and the rule "daily bars are final at 22:30 UTC". Then diff your version against the repo version and explain every difference. Finish with a pytest table: Friday before/after settle, Monday morning, a holiday Monday, New Year.',
+    files: ['quotes-api/backend/feed_refresh.py'],
+    timeboxMin: 30,
+    skills: ['datetime arithmetic', 'edge-case tables', 'reading vs writing code', 'pytest parametrization'],
+    twists: [
+      'Bug seed: the settle check uses > instead of >= - what runs break, and why does it only show up once a day?',
+      'MIN_FRESH_RATIO is 0.9 for 54 symbols - how many stragglers does that tolerate, and is int(floor) vs round a bug here?',
+      'The job writes Firestore directly because Cloud Run was down in a two-day billing outage. Talk through why this file must stay dependency-light.',
+    ],
+    talkingPoints: [
+      'Narration practice: calendar code is where interviewers watch you think. Say the invariant first - "the answer is always a trading day at or before now, and settle time shifts it back one day" - then write code that obviously preserves it.',
+    ],
+    evidence: ['quotes-api/backend/feed_refresh.py'] },
+
+  { id: 'x-verdict-core', type: 'exercise', label: 'Rep: FIFO cost basis (ledger-app)',
+    summary: 'Debugging rep on ledger-app backend/core.py: a multi-lot position model with FIFO/LIFO/average cost-basis methods, split adjustment, and pydantic validation. 53 KB of real production Python.',
+    prompt: 'Trace compute_verdict() from a raw request to a verdict for a two-lot position sold under FIFO. Then: given lots [(100 @ $10), (100 @ $20)] and a sale of 150 shares, compute the realized P&L under FIFO, LIFO, and average cost by hand, then find the code path that does each.',
+    files: ['ledger-app/backend/core.py', 'ledger-app/backend/tests/test_core.py'],
+    timeboxMin: 30,
+    skills: ['reading large modules', 'pydantic validators', 'financial correctness', 'FIFO/LIFO accounting'],
+    twists: [
+      'Bug seed: the symbol regex allows a leading digit-only string like "1234" - is that a valid ticker? Defend the validator behavior either way.',
+      'A 2:1 split arrives between buy and sell: walk the split-adjustment path and say what must be adjusted - quantity, basis, or both - before looking.',
+      'core.py does os.chdir and sys.path.insert at import time. Discuss why (merged build context on Cloud Run), what it breaks (test isolation, import order), and how you would refactor it behind a function.',
+    ],
+    talkingPoints: [
+      'The design story to practice: core.py is transport-agnostic so FastAPI, the CLI, and the MCP server share one engine. When an interviewer asks about code reuse, this is a concrete, opinionated example with real costs (the import-time path hacks) you can name.',
+    ],
+    evidence: ['ledger-app/backend/core.py', 'ledger-app/backend/tests/test_core.py'] },
+
+  { id: 'x-scheduler-auth', type: 'exercise', label: 'Rep: OIDC verify + secret fallback',
+    summary: 'Live-coding rep reproducing quotes-api verify_worker(): validate a Google OIDC bearer token (audience = service URL, expected service account) with an X-Worker-Token shared-secret fallback for GHA and manual calls.',
+    prompt: 'Write verify_worker(request) -> bool for FastAPI: if Authorization Bearer is present, verify the OIDC token with google.oauth2.id_token.verify_oauth2_token, checking audience and the expected SA email; else fall back to a constant-time compare of X-Worker-Token against the env secret. Tests: valid token, wrong audience, expired token, correct secret, wrong secret, both missing.',
+    files: ['quotes-api/backend/main.py', 'quotes-api/backend/cloudbuild.yaml'],
+    timeboxMin: 25,
+    skills: ['auth middleware', 'constant-time comparison (hmac.compare_digest)', 'env config', 'FastAPI dependency injection'],
+    twists: [
+      'Bug seed: the fallback uses == instead of hmac.compare_digest - what attack does that open, and how visible is it in practice?',
+      'The silent-401 failure mode: the shared secret rotated in Secret Manager but the scheduler jobs were not updated. Walk the three-step rotation and say where it broke.',
+      'Why allow unauthenticated at the IAM layer at all? Defend the app-level auth trade, then describe the run.invoker end-state.',
+    ],
+    talkingPoints: [
+      'This rep doubles as infra fluency: every line of the exercise is a talking point from the graph - OIDC versus bearer, the rotation dance, the WIF migration. Practice it until the code and the story are the same thing.',
+    ],
+    evidence: ['quotes-api/backend/main.py', 'project-wiki/scheduler-jobs-config.md'] },
+
+  { id: 'x-price-sharding', type: 'exercise', label: 'Rep: yearly subcollections (1 MiB cap)',
+    summary: 'Design-and-code rep on quotes-api backend/price_store.py: price_history is permanent and sharded into yearly subcollections so no document nears the 1 MiB Firestore cap.',
+    prompt: 'Write store_daily_bar(symbol, day, bar) that routes writes into a yearly subcollection, and read_history(symbol, start, end) that spans year boundaries transparently. Then the estimation question: a daily bar is about 120 bytes of JSON - how many years fit in one document at 1 MiB, and why shard yearly anyway?',
+    files: ['quotes-api/backend/price_store.py', 'quotes-api/backend/archiver.py'],
+    timeboxMin: 20,
+    skills: ['data modeling under limits', 'back-of-envelope sizing', 'API design that hides sharding'],
+    twists: [
+      'The sizing answer: 1 MiB over 120 bytes is roughly 8,700 bars, about 34 trading years - so yearly sharding is about read amplification and purge granularity, not the cap. Defend or attack that reasoning.',
+      'purge-cache archives to Parquet before deleting: write the archive-then-delete sequence and say why the order matters (crash between the two steps).',
+      'Hot document trap: a single counters doc can take about 1 sustained write per second - how would you shard a counter, and how do you read it back?',
+    ],
+    talkingPoints: [
+      'The fluency link: this exercise is the Firestore node made physical - TTL, the 1 MiB cap, hot documents, archive-before-delete. When the talking points and the reps reinforce each other, two hours of expert talk is just walking the graph.',
+    ],
+    evidence: ['quotes-api/backend/price_store.py', 'quotes-api/backend/archiver.py'] },
+];
+
+// Relationships. Kinds are the verbs of the estate: deploys-to, triggers,
+// stores-in, aws-equivalent-is, caused-by, fixed-by.
+export const EDGES = [
+  // Serving and data flow
+  { source: 'fe-main-site', target: 'svc-data-api', kind: 'proxies_to' },
+  { source: 'fe-ledger-app', target: 'svc-ledger-api', kind: 'proxies_to' },
+  { source: 'svc-data-api', target: 'svc-analysis-api', kind: 'calls' },
+  { source: 'svc-data-api', target: 'ds-firestore', kind: 'stores_in' },
+  { source: 'svc-analysis-api', target: 'ds-firestore', kind: 'stores_in' },
+  { source: 'svc-mcp-engine', target: 'ds-firestore', kind: 'stores_in' },
+  { source: 'svc-ledger-api', target: 'svc-mcp-engine', kind: 'part_of' },
+  { source: 'fe-portal', target: 'ds-neon', kind: 'stores_in' },
+  { source: 'sch-modal-tick', target: 'ds-dynamodb', kind: 'stores_in' },
+  { source: 'sch-modal-tick', target: 'ds-neon', kind: 'stores_in' },
+  { source: 'ds-firestore', target: 'ds-gcs-parquet', kind: 'archives_to' },
+
+  // Build and ship
+  { source: 'svc-data-api', target: 'ds-artifact-registry', kind: 'ships_via' },
+  { source: 'svc-analysis-api', target: 'ds-artifact-registry', kind: 'ships_via' },
+  { source: 'svc-ledger-api', target: 'ds-artifact-registry', kind: 'ships_via' },
+  { source: 'svc-mcp-engine', target: 'ds-artifact-registry', kind: 'ships_via' },
+
+  // Triggers
+  { source: 'sch-cloud-scheduler', target: 'svc-data-api', kind: 'triggers' },
+  { source: 'sch-cloud-scheduler', target: 'svc-free-tier-refresh', kind: 'triggers' },
+  { source: 'sch-gha-cron', target: 'svc-data-api', kind: 'calls' },
+  { source: 'sch-gha-cron', target: 'sch-pubsub-trigger', kind: 'triggers' },
+  { source: 'sch-pubsub-trigger', target: 'svc-daily-analysis', kind: 'triggers' },
+  { source: 'sch-gha-cron', target: 'ds-firestore', kind: 'stores_in' },
+
+  // GHA patterns
+  { source: 'gha-dual-cron', target: 'sch-gha-cron', kind: 'part_of' },
+  { source: 'gha-slot1-flag', target: 'sch-gha-cron', kind: 'part_of' },
+  { source: 'gha-slot1-flag', target: 'sch-cloud-scheduler', kind: 'replaces' },
+  { source: 'gha-concurrency', target: 'sch-gha-cron', kind: 'part_of' },
+  { source: 'gha-fail-loud', target: 'sch-gha-cron', kind: 'part_of' },
+  { source: 'gha-bot-prs', target: 'sch-gha-cron', kind: 'part_of' },
+  { source: 'gha-cron-caveats', target: 'sch-gha-cron', kind: 'part_of' },
+  { source: 'gha-staggered', target: 'sch-gha-cron', kind: 'part_of' },
+  { source: 'gha-staggered', target: 'sch-cloud-scheduler', kind: 'part_of' },
+  { source: 'gha-staggered', target: 'sch-modal-tick', kind: 'part_of' },
+  { source: 'gha-neon-branch', target: 'fe-portal', kind: 'part_of' },
+  { source: 'gha-oidc', target: 'c-wif', kind: 'migrates_to' },
+
+  // Concepts anchor to the estate
+  { source: 'c-revisions', target: 'svc-data-api', kind: 'part_of' },
+  { source: 'c-minscale', target: 'svc-data-api', kind: 'part_of' },
+  { source: 'c-minscale', target: 'c-request-vs-instance-billing', kind: 'part_of' },
+  { source: 'c-scale-to-zero', target: 'svc-data-api', kind: 'part_of' },
+  { source: 'c-set-secrets', target: 'svc-data-api', kind: 'secures' },
+  { source: 'c-oidc-vs-bearer', target: 'sch-cloud-scheduler', kind: 'secures' },
+  { source: 'c-oidc-vs-bearer', target: 'c-wif', kind: 'migrates_to' },
+  { source: 'c-concurrency', target: 'svc-data-api', kind: 'part_of' },
+  { source: 'c-attempt-deadline', target: 'sch-cloud-scheduler', kind: 'part_of' },
+  { source: 'c-ttl-eventual', target: 'ds-firestore', kind: 'part_of' },
+  { source: 'c-ttl-eventual', target: 'ds-dynamodb', kind: 'part_of' },
+  { source: 'c-idempotency', target: 'sch-cloud-scheduler', kind: 'part_of' },
+  { source: 'c-idempotency', target: 'ds-dynamodb', kind: 'part_of' },
+  { source: 'c-deploy-gap', target: 'svc-data-api', kind: 'part_of' },
+  { source: 'c-deploy-gap', target: 'svc-mcp-engine', kind: 'relates_to' },
+  { source: 'c-wif', target: 'sch-gha-cron', kind: 'secures' },
+
+  // Incidents: cause and fix
+  { source: 'i-minscale-bill', target: 'c-minscale', kind: 'caused_by' },
+  { source: 'i-minscale-bill', target: 'c-scale-to-zero', kind: 'fixed_by' },
+  { source: 'i-stale-revisions', target: 'c-revisions', kind: 'caused_by' },
+  { source: 'i-stale-revisions', target: 'ds-artifact-registry', kind: 'fixed_by' },
+  { source: 'i-skip-gemini', target: 'sch-cloud-scheduler', kind: 'caused_by' },
+  { source: 'i-sectors-dns', target: 'fe-main-site', kind: 'caused_by' },
+  { source: 'i-billing-outage', target: 'svc-data-api', kind: 'relates_to' },
+  { source: 'i-billing-outage', target: 'gha-staggered', kind: 'fixed_by' },
+  { source: 'i-deadline-mismatch', target: 'c-attempt-deadline', kind: 'caused_by' },
+  { source: 'i-deadline-mismatch', target: 'svc-data-api', kind: 'relates_to' },
+  { source: 'i-midday-quotes-200', target: 'sch-cloud-scheduler', kind: 'caused_by' },
+  { source: 'i-midday-quotes-200', target: 'c-idempotency', kind: 'fixed_by' },
+  { source: 'i-static-sa-key', target: 'sch-gha-cron', kind: 'caused_by' },
+  { source: 'i-static-sa-key', target: 'c-wif', kind: 'fixed_by' },
+  { source: 'i-idor-authorization', target: 'svc-data-api', kind: 'relates_to' },
+  { source: 'i-idor-authorization', target: 'c-deploy-gap', kind: 'relates_to' },
+  { source: 'i-free-model-failures', target: 'svc-free-tier-refresh', kind: 'relates_to' },
+  { source: 'i-thundering-herd-429', target: 'c-concurrency', kind: 'caused_by' },
+  { source: 'i-thundering-herd-429', target: 'ds-firestore', kind: 'mitigated_by' },
+
+  // AWS translations
+  { source: 'svc-data-api', target: 'aws-fargate', kind: 'aws_equivalent_is' },
+  { source: 'svc-ledger-api', target: 'aws-fargate', kind: 'aws_equivalent_is' },
+  { source: 'svc-free-tier-refresh', target: 'aws-fargate', kind: 'aws_equivalent_is' },
+  { source: 'sch-cloud-scheduler', target: 'aws-eventbridge', kind: 'aws_equivalent_is' },
+  { source: 'sch-pubsub-trigger', target: 'aws-sns-sqs', kind: 'aws_equivalent_is' },
+  { source: 'svc-daily-analysis', target: 'aws-lambda', kind: 'aws_equivalent_is' },
+  { source: 'ds-firestore', target: 'aws-dynamodb-x', kind: 'aws_equivalent_is' },
+  { source: 'ds-gcs-parquet', target: 'aws-s3', kind: 'aws_equivalent_is' },
+  { source: 'ds-artifact-registry', target: 'aws-ecr', kind: 'aws_equivalent_is' },
+  { source: 'ds-neon', target: 'aws-aurora', kind: 'aws_equivalent_is' },
+  { source: 'c-set-secrets', target: 'aws-secrets-manager', kind: 'aws_equivalent_is' },
+  { source: 'c-wif', target: 'aws-iam-oidc', kind: 'aws_equivalent_is' },
+  { source: 'fe-static-site', target: 'aws-s3', kind: 'aws_equivalent_is' },
+  { source: 'fe-mobile-app', target: 'aws-cognito', kind: 'aws_equivalent_is' },
+  { source: 'fe-main-site', target: 'aws-s3', kind: 'aws_equivalent_is' },
+  { source: 'svc-data-api', target: 'aws-cloudwatch', kind: 'aws_equivalent_is' },
+  { source: 'ds-dynamodb', target: 'aws-dynamodb-x', kind: 'part_of' },
+
+  { source: 'svc-data-api', target: 'aws-codebuild', kind: 'aws_equivalent_is' },
+  { source: 'fe-portal', target: 'svc-mcp-engine', kind: 'calls' },
+  { source: 'sch-gha-cron', target: 'ds-supabase', kind: 'stores_in' },
+  { source: 'fe-mobile-app', target: 'fe-portal', kind: 'part_of' },
+  { source: 'fe-static-site', target: 'fe-main-site', kind: 'relates_to' },
+
+  // Practice wing
+  { source: 'x-run-budget', target: 'svc-data-api', kind: 'practices_on' },
+  { source: 'x-mem-cache', target: 'ds-firestore', kind: 'practices_on' },
+  { source: 'x-feed-freshness', target: 'gha-staggered', kind: 'practices_on' },
+  { source: 'x-verdict-core', target: 'svc-ledger-api', kind: 'practices_on' },
+  { source: 'x-scheduler-auth', target: 'c-oidc-vs-bearer', kind: 'practices_on' },
+  { source: 'x-price-sharding', target: 'ds-firestore', kind: 'practices_on' },
+];
