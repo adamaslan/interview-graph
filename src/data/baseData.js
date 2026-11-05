@@ -1036,7 +1036,7 @@ export const NODES = [
       { q: 'You wrap a pure CPU-bound pricing loop in asyncio.gather. What does the benchmark show?',
         choices: ['No speedup - coroutines share one thread and CPU work never yields to the event loop', 'A slowdown from semaphore overhead only', 'Linear speedup with task count', 'Faster, but only on Python 3.13'],
         answer: 0,
-        why: 'Asyncio is cooperative: a coroutine runs until it awaits, and a pure CPU loop contains no awaits, so it monopolizes the single thread the loop runs on. The GIL governs threads, not coroutines - even a GIL-free build would not parallelize this. Only processes sidestep it.' },
+        why: 'Asyncio is cooperative: a coroutine runs until it awaits, and a pure CPU loop contains no awaits, so it monopolizes the single thread the loop runs on. The GIL governs threads, not coroutines - even a GIL-free build would not parallelize this. On standard CPython, real parallelism for pure-Python CPU work usually means a process pool; native extensions that release the GIL are another route.' },
       { q: 'When do threads still help despite the GIL?',
         choices: ['Never in CPython', 'Only inside dataclasses', 'Only with numpy', 'When the work waits on I/O - threads release the GIL during blocking calls in standard CPython'],
         answer: 3,
