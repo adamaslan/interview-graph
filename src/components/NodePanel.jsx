@@ -19,8 +19,8 @@ function QuizItem({ item, index }) {
           const isAnswer = ci === item.answer;
           const isPicked = ci === picked;
           let style = {};
-          if (answered && isAnswer) style = { borderColor: 'var(--fam-infra)', color: 'var(--fam-infra)', fontWeight: 600 };
-          else if (answered && isPicked) style = { borderColor: 'var(--fam-fire)', color: 'var(--fam-fire)' };
+          if (answered && isAnswer) style = { borderColor: 'var(--fam-infra)', color: 'var(--fam-infra)', fontWeight: 600, opacity: 1 };
+          else if (answered && isPicked) style = { borderColor: 'var(--fam-fire)', color: 'var(--fam-fire)', opacity: 1 };
           else if (answered) style = { opacity: 0.55 };
           return (
             <button key={ci} type="button" className="ctl text-left" style={style}
