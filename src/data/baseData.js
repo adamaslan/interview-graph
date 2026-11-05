@@ -16,6 +16,16 @@ export const NODES = [
       'The 9:35 AM bake fans out from this service to analysis-api over HTTP - /scan plus several compute endpoints - as stage 4 of 9 in the refresh cycle. Service-to-service over plain HTTPS because both are public-with-app-auth.',
       'Sizing story (illustrative): 1 GiB and 1 vCPU with a low max-instances cap. The cap is why a burst of /quotes calls hitting a rate-limited vendor ended in 503s - instances waited on upstream, the pool saturated, and the cap meant no more capacity. Claim, mechanism, number, trade-off.',
     ],
+    quiz: [
+      { q: 'A production FastAPI container is capped at 50 concurrent inputs and a burst of requests all end up waiting on the same rate-limited market-data vendor. Which node\'s math explains the 503s that follow?',
+        choices: ['Concurrency 80, and when to tune it down: concurrency times max instances is the real ceiling, and every in-flight request can block on one upstream', 'TTL deletes are eventual: expired cache entries piled up', 'The deploy gap: merged is not live, so the fix never shipped', 'Revisions and rollback: a new revision misrouted the traffic'],
+        answer: 0,
+        why: 'The cold-cache thundering herd incident is exactly this chain: vendor 429s cascade into 503s when in-flight capacity multiplies against one slow upstream. Capacity is arithmetic, not vibes.' },
+      { q: 'The NWF API keeps one warm container with a ten-minute scaledown window while the estate services run min-instances 0. What decides between the two?',
+        choices: ['Warm containers are required for secrets to load', 'The caller profile: a user-facing API pays for warmth as an insurance premium, while scheduler-driven bursts tolerate cold starts', 'Request-based billing forbids warm instances', 'Scale-to-zero platforms cannot serve HTTP APIs'],
+        answer: 1,
+        why: 'Same trade as minScale is a bill, not a setting, one platform over: warmth is a bill, and you pay it when the caller is a user, not a scheduler.' },
+    ],
     evidence: ['quotes-api/backend/cloudbuild.yaml', 'quotes-api/README.md', 'quotes-api/ARCHITECTURE.md'] },
 
   { id: 'svc-analysis-api', type: 'service', label: 'analysis-api',
@@ -24,6 +34,12 @@ export const NODES = [
       'It exists because the heavy analysis work is CPU-bound Python - separating it keeps the main API responsive and lets each service scale independently. One CPU-bound request can starve the other 79 slots on a shared instance.',
       'Called by data-api during the 9:35 bake fan-out: /scan plus several compute endpoints. Same project, same region, same manual cloudbuild pattern - so it shares the same deploy-gap weakness.',
       'It keeps its own Firestore cache (analysis_cache), so a cache purge on the main backend does not stall the analysis paths.',
+    ],
+    quiz: [
+      { q: 'Why does the estate split heavy yfinance-style analysis into its own service instead of one bigger API, and which concept states the reason?',
+        choices: ['TTL deletes are eventual: the analysis cache expires differently', 'Concurrency 80, and when to tune it down: one CPU-bound Python request can starve the other slots on a shared instance', 'Idempotency and at-least-once delivery: analysis calls may replay', 'Revisions and rollback: separate services roll back independently'],
+        answer: 1,
+        why: 'The NWF signals pipeline has the same shape: per-ticker indicator frames are CPU-bound pandas work, so they run as their own scheduled stage rather than inside the request path.' },
     ],
     evidence: ['quotes-api/backend2/cloudbuild.yaml', 'quotes-api/ARCHITECTURE.md'] },
 
@@ -34,6 +50,12 @@ export const NODES = [
       'core.py is transport-agnostic on purpose: the FastAPI app, the CLI, and the MCP server all call the same compute_verdict() without importing FastAPI or triggering route registration. main.py is a thin HTTP adapter. That is a design decision I can talk about for minutes.',
       'The Dockerfile is a third container pattern in my estate: mambaorg/micromamba multi-stage with a conda env and a HEALTHCHECK, versus python:3.11-slim single-stage with a non-root user for quotes-api backend, and node:22-alpine multi-stage with Next standalone output for the frontend. Three legitimately different patterns, and I can compare them out loud.',
     ],
+    quiz: [
+      { q: 'ledger-api keeps core.py transport-agnostic so the FastAPI app, CLI and MCP server share one compute path. Where does the NWF codebase use the same move?',
+        choices: ['The Terraform slot: variables share one state file', 'The Firestore layer: batch writes share one timestamp', 'The portal frontend: Next.js API routes share one CSS file', 'The Modal backend: modal_app.py is a thin wrapper over plain, unit-tested job entrypoints that know nothing about Modal'],
+        answer: 3,
+        why: 'Transport-agnostic cores are what make both testable: the NWF job logic is unit-tested as plain Python, exactly the design decision the ledger-api talking points brag about.' },
+    ],
     evidence: ['ledger-app/deploy-backend.sh', 'ledger-app/backend/cloud-run/Dockerfile', 'ledger-app/backend/core.py'] },
 
   { id: 'svc-mcp-engine', type: 'service', label: 'mcp-engine',
@@ -42,6 +64,12 @@ export const NODES = [
       'This is the shared analysis engine: ledger-app mounts its source tree into the build, and quotes-api calls its compute and scan logic. One engine, three consumers - which is exactly why its deploy script assembling a merged context matters.',
       'Reliability contrast I can cite: a handful of errors in a month for this service versus the overwhelming share of estate-wide errors coming from data-api. Same platform, very different failure profiles - the difference is upstream vendor waits, not the code.',
       'Known gap I name first: mcp-engine production runs on uncommitted local state - main does not even import. That is the deploy gap at its worst, and the fix is boring: commit, CI, deploy from main.',
+    ],
+    quiz: [
+      { q: 'mcp-engine production once ran uncommitted local state. Which concept names this disease, and what does the NWF pipeline do differently for its deploy proof?',
+        choices: ['Scale-to-zero and cold starts - and NWF keeps the engine warm', 'Request-based vs instance-based billing - and NWF pays instance-based', 'TTL deletes are eventual - and NWF deletes old images nightly', 'The deploy gap: merged is not live - and the NWF shadow preflight job was deployed by immutable image digest so exactly what ran is pinned'],
+        answer: 3,
+        why: 'An immutable digest is the opposite of a dirty checkout: the artifact that ran is identified exactly. Commit, CI, deploy from a pinned artifact closes the gap on both services.' },
     ],
     evidence: ['mcp-engine/cloudbuild.yaml', 'legacy deploy scripts'] },
 
@@ -52,6 +80,12 @@ export const NODES = [
       'Its deploy-gcp.sh is the cleanest deploy pattern in the estate: Cloud Build image, gcloud run jobs deploy, scheduler creation, idempotent, dedicated service account, secrets through Secret Manager. When asked "what good looks like", I describe this script.',
       'Open flaw I volunteer: it failed 4 of 4 Monday runs at the October audit and stderr was not captured, so root cause is unknown. First check is the env file the job reads; the fix is structured error output so a failure explains itself.',
     ],
+    quiz: [
+      { q: 'What makes a Cloud Run Job the right shape for long refresh work, connecting this node to Scheduler attempt deadline vs backend work?',
+        choices: ['A job gets a public URL so Scheduler can retry it', 'A job runs to completion with no request deadline, so the caller-gives-up-first problem disappears instead of being tuned', 'A job shares the service revision so rollback is free', 'A job bypasses IAM so auth is simpler'],
+        answer: 1,
+        why: 'The NWF estate proves the shape: its shadow preflight ran as a Cloud Run Job by immutable digest with no schedule - a credential and deploy smoke check that runs to completion and exits.' },
+    ],
     evidence: ['news-portal/deploy/free-tier-refresh/deploy-gcp.sh', 'internal estate notes'] },
 
   { id: 'svc-daily-analysis', type: 'service', label: 'daily-analysis (Function)',
@@ -60,6 +94,12 @@ export const NODES = [
       'The pattern: GHA publishes daily-analysis-trigger, Pub/Sub delivers at-least-once to the function. Decoupling the cron from the long job means the scheduler does not care how long the analysis takes.',
       'At-least-once means duplicates will arrive, so the handler must be idempotent - and I would add a dead-letter topic plus an alert, which is the answer to "what happens if the function fails".',
       'Second-gen functions run on Cloud Run under the hood, so everything about revisions, concurrency and IAM carries over.',
+    ],
+    quiz: [
+      { q: 'A Pub/Sub-triggered function gets the same message twice. Which concept should the handler already satisfy, and where does NWF encode the same guarantee?',
+        choices: ['minScale is a bill, not a setting - the function scales to zero', 'Revisions and rollback - the function pins an old revision', 'TTL deletes are eventual - the function filters expired messages', 'Idempotency and at-least-once delivery - the NWF paper-settle path has a dedicated idempotency test, and its job runner claims each run key once'],
+        answer: 3,
+        why: 'At-least-once means duplicates will arrive. NWF answers twice over: a paper-settle idempotency test at the app layer, and a job_runs claim guard at the job layer.' },
     ],
     evidence: ['quotes-api/.github/workflows/', 'study notes'] },
 
@@ -72,6 +112,12 @@ export const NODES = [
       'Split-brain I manage deliberately: the same frontend can deploy to Cloud Run with BUILD_STANDALONE=true producing Next standalone output, while Vercel builds get the default output - one Dockerfile arg switches the artifact. Vercel is the production path; Cloud Run is the escape hatch.',
       'Why Vercel and not AWS: for Next.js, Vercel is best-in-class; the honest AWS port is OpenNext on CloudFront or Amplify Hosting. Knowing why you stay is the senior answer.',
     ],
+    quiz: [
+      { q: 'The NWF portal once had 13 files hardcoding one backend hostname while 6 other call sites hard-failed without the env var. What is the interview lesson for this proxy pattern?',
+        choices: ['Every call site should keep its own fallback for resilience', 'Env vars are only for secrets, not URLs', 'One dependency, one policy: a server-side proxy should read one configured backend URL everywhere, or a migration silently fixes only half the call sites', 'Hardcoding is fine if the hostname is stable'],
+        answer: 2,
+        why: 'Two contradictory policies for one dependency is itself a source of it broke again: changing the env var fixes six call sites and does nothing for thirteen. The proxy pattern only works if the URL flows through one place.' },
+    ],
     evidence: ['quotes-api/.env.example', 'project-wiki/deployment-flow.md', 'quotes-api/frontend/Dockerfile'] },
 
   { id: 'fe-ledger-app', type: 'frontend', label: 'ledger-app web (Next.js 16)',
@@ -79,6 +125,12 @@ export const NODES = [
     talkingPoints: [
       'Same proxy pattern as news-portal: BACKEND_URL server-side, browser never sees the backend address. One pattern, reused - that consistency is deliberate.',
       'Honest edge-of-knowledge practice: the repo does not evidence where this frontend deploys. The guide marks it UNVERIFIED rather than guessing. In an interview that sentence is "I have not verified that" - which is a stronger move than bluffing.',
+    ],
+    quiz: [
+      { q: 'The ledger-app frontend deploy target is marked UNVERIFIED in the guide. What is the strong interview move here?',
+        choices: ['Say I have not verified that and name the one check that would settle it', 'Guess Vercel because the sibling frontend deploys there', 'Skip the topic until the interviewer moves on', 'Claim both Vercel and Cloud Run to cover the bases'],
+        answer: 0,
+        why: 'This is the same discipline as the deploy gap node: an open question with a named verification step reads as control, and bluffing a deploy target is one curl away from being caught.' },
     ],
     evidence: ['ledger-app/README.md'] },
 
@@ -89,6 +141,16 @@ export const NODES = [
       'Backups are the proven pattern here: a nightly GHA workflow snapshots Neon to SQLite. The recommendation I would repeat elsewhere: schedule the quotes-api Firestore export using this exact pattern, because right now that backup script exists but is manual and unscheduled.',
       'CI worth bragging about: integration tests create a Neon branch, migrate the schema onto it, run, and delete the branch - real Postgres, no shared state, skipped cleanly on forks without secrets.',
     ],
+    quiz: [
+      { q: 'The NWF Python API talks to Neon through PgBouncer in transaction mode. What code-level consequence does the Python side have to respect?',
+        choices: ['No prepared statements: the asyncpg pool sets statement_cache_size 0, and session settings go through a plain statement, not a startup parameter', 'It must open a new TCP connection per query', 'It must wrap every read in a serializable transaction', 'It must pin all queries to the primary region'],
+        answer: 0,
+        why: 'Transaction-mode pooling reuses server connections between statements, so per-connection prepared state cannot be assumed. This connects Neon Postgres to the API layer: the pooler choice dictates the driver config.' },
+      { q: 'Nightly backup of the portal database silently failed for a week on a response-size cap until a fix PR. Which two nodes does that incident connect?',
+        choices: ['Cognito, and IDOR derive customer id server-side', 'Artifact Registry, and Revisions and rollback', 'Neon Postgres as the system of record, and Fail loudly into an issue, because a scheduled job with no notification is the real outage', 'Cloud Scheduler, and Concurrency 80'],
+        answer: 2,
+        why: 'The proven pattern in this estate is a nightly workflow snapshotting the database to a file; the lesson is that the failure notification IS the monitoring for any scheduled job, backups included.' },
+    ],
     evidence: ['news-portal/.github/workflows/backup-to-sqlite.yml', 'study notes'] },
 
   { id: 'fe-static-site', type: 'frontend', label: 'static-site (Netlify static)',
@@ -97,6 +159,12 @@ export const NODES = [
       'The boring end of the spectrum: a static site needs no server, no secrets, no scheduler. Netlify builds on push. The AWS port is S3 plus CloudFront and takes an afternoon.',
       'Worth naming in a cost conversation: not everything belongs on Cloud Run. Matching the hosting to the workload is itself an architecture skill.',
     ],
+    quiz: [
+      { q: 'Why is a static site on Netlify a deliberate architecture answer rather than the boring default?',
+        choices: ['It avoids needing DNS records entirely', 'Netlify is the only host with a free tier', 'Matching hosting to workload is a skill: no server, no secrets, no scheduler, and the AWS port is S3 plus CloudFront in an afternoon', 'Static sites are always cheaper at any scale'],
+        answer: 2,
+        why: 'The NWF family shows the spectrum: a full modal backend with twenty cron stages on one end, a no-GCP static site on the other. Choosing the simple end when the workload allows it is the senior call.' },
+    ],
     evidence: ['internal estate notes'] },
 
   { id: 'fe-mobile-app', type: 'frontend', label: 'Expo mobile app',
@@ -104,6 +172,12 @@ export const NODES = [
     talkingPoints: [
       'The auth chain: Clerk on the app side, GCP Identity Platform as the Google OAuth provider. The AWS answer is Cognito user pools with a social IdP - or keep Clerk, because the abstraction layer already isolates the choice.',
       'Small Terraform, real discipline: variables without defaults so nothing deploys by accident. That is the applied-scope end of my IaC, contrasted with the designed-but-not-applied new-pipeline slot.',
+    ],
+    quiz: [
+      { q: 'The mobile app provisions its Google OAuth client with Terraform variables that have no defaults. What does that buy, and what is the AWS-side answer it connects to?',
+        choices: ['Automatic DNS; the translation is Route 53 health checks', 'Faster applies; the translation is IAM users per mobile install', 'Free OAuth clients; the translation is API Gateway keys', 'Nothing deploys by accident; the translation is Cognito user pools with a social IdP, or keep Clerk since the abstraction already isolates the choice'],
+        answer: 3,
+        why: 'Variables without defaults are applied-scope discipline: the same estate keeps a designed-but-not-applied pipeline slot honest by forcing explicit values. Small Terraform, real discipline.' },
     ],
     evidence: ['mobile-app/terraform/main.tf'] },
 
@@ -117,6 +191,16 @@ export const NODES = [
       'Billing is per operation, not per query-time - so a cache that re-reads on every request costs more than one that batches. The backend also has an in-memory LRU layer capped at 256 entries in front of Firestore for hot paths like quotes.',
       'Open gap: the NDJSON export backup script exists but is manual and unscheduled. The fix is to schedule it via the portal proven nightly GHA pattern.',
     ],
+    quiz: [
+      { q: 'The NWF refresh pipeline writes one digest document per day to Firestore and refuses to publish when zero signals were generated, exiting non-zero. Which incident does that guard come from?',
+        choices: ['Stale revisions pruned - old documents were filling the registry', 'midday-quotes: 200 with 6 of 54 missing - success must be defined by the payload, or an empty run blanks the previous good digest', 'a portal subdomain silent 404 - the DNS record was missing', 'minScale was most of the bill - warm capacity cost too much'],
+        answer: 1,
+        why: 'An empty publication would replace the cached good digest with nothing, and a green exit code would hide it. Failing loudly on empty output is payload-defined success applied to a batch write.' },
+      { q: 'The NWF local pipeline writes five collections in one Firestore batch and gives partial runs their own -partial-HHMMSS day key instead of the plain date key. Why?',
+        choices: ['So a partial run can never replace the complete publication for that day - atomic batch plus a completeness-keyed document id', 'Because the TTL policy needs unique keys to expire', 'Because Firestore rejects duplicate document ids', 'Because partial runs are cheaper under per-operation billing'],
+        answer: 0,
+        why: 'This is idempotency with a blast-radius guard: re-running the complete pipeline converges onto the same key, while an incomplete run is quarantined. Same lesson as Idempotency and at-least-once delivery.' },
+    ],
     evidence: ['quotes-api/backend/firestore.py', 'quotes-api/backend/price_store.py', 'quotes-api/backend/archiver.py'] },
 
   { id: 'ds-neon', type: 'datastore', label: 'Neon Postgres',
@@ -125,6 +209,12 @@ export const NODES = [
       'Why a second database vendor: relational data with joins - users, positions, news - does not belong in a document cache. Neon gives serverless Postgres with branching, and branching is what makes the CI pattern possible.',
       'The CI trick: neondatabase/create-branch-action makes an ephemeral branch per test run, the schema migrates onto it, tests run, the branch is deleted. Real Postgres, zero shared state, and it skips cleanly on forks that lack secrets.',
       'AWS translation: Aurora Serverless v2, or RDS if you want the plain answer. Serverless Postgres exists on both sides; the choice was about branching and price, not religion.',
+    ],
+    quiz: [
+      { q: 'NWF job code uses a sync psycopg connection in autocommit for the job_runs claim table, while the API uses an asyncpg pool. Why autocommit for the jobs?',
+        choices: ['Autocommit is faster for bulk inserts', 'Psycopg cannot run inside transactions', 'Claims and heartbeats must be visible to other containers at once; a transaction would hide the claim until commit and two runners could both take the job', 'Neon requires autocommit over PgBouncer'],
+        answer: 2,
+        why: 'This connects Neon to Idempotency and at-least-once delivery: the claim row is the lock, and a lock nobody else can see yet is not a lock. Visibility timing is the whole design.' },
     ],
     evidence: ['news-portal/.github/workflows/', 'study notes'] },
 
@@ -137,6 +227,16 @@ export const NODES = [
       'TTL is enabled on expires_at for four tables and deliberately off for news_cursor and live_prices, which must persist. TTL deletes are eventual - reads still filter on expires_at.',
       'What I would admit unprompted: the credential is a long-lived IAM user access key sitting in a Modal secret, not a short-lived role - the upgrade is an IAM role with OIDC federation. Provisioned capacity with no autoscaling throttles under burst; on-demand would be safer at a small premium. And a cross-cloud hop from Modal to AWS adds latency to every rate-limit check.',
     ],
+    quiz: [
+      { q: 'The NWF DynamoDB layer converts every float to Decimal before writing, and maps NaN and infinity to None. Why?',
+        choices: ['The free tier only meters Decimal writes', 'Decimal is faster to store than float', 'DynamoDB indexes cannot contain floats', 'boto3 rejects native floats, and a NaN or infinite indicator value would otherwise crash the whole mirror write'],
+        answer: 3,
+        why: 'Real pipeline data contains NaNs - an RSI before enough bars exist is the classic case. The conversion layer exists so one bad value cannot take down the write-through mirror of every pipeline output.' },
+      { q: 'What failure contract does the NWF write-through mirror to DynamoDB promise the pipeline, and which concept does it lean on?',
+        choices: ['A mirror failure never fails the job - it logs at WARNING - because Neon stays the system of record and the mirror is a copy', 'A mirror failure flips the table to on-demand billing', 'A mirror failure rolls back the Neon write', 'A mirror failure retries until it succeeds, blocking the job'],
+        answer: 0,
+        why: 'Knowing which store is the system of record decides who may fail. The mirror is belt and suspenders like the archive half of the GCS Parquet archive node: extra durability, never a new single point of failure.' },
+    ],
     evidence: ['news-portal/docs/aws-modal-pipeline-notes.md', 'study notes'] },
 
   { id: 'ds-gcs-parquet', type: 'datastore', label: 'GCS Parquet archive',
@@ -145,6 +245,12 @@ export const NODES = [
       'The design rule: TTL is a cache policy, not a data policy. Anything with historical value is archived to Parquet in GCS before the delete, so storage classes and lifecycle rules - Nearline at 7 days, delete at 30 - apply to the archive, not the source of truth.',
       'AWS translation is one-to-one: S3 with a lifecycle transition to Standard-IA then Glacier. My 7-day-Nearline, 30-day-delete rule is the same shape as S3 lifecycle.',
       'The failure question: what happens if the archive succeeds and the delete fails? Nothing - the doc lingers, TTL gets it later. And if the archive fails? The delete must not run. Ordering is the whole design: archive, verify, then delete.',
+    ],
+    quiz: [
+      { q: 'What ordering rule does purge-cache follow, and what happens if the archive step fails?',
+        choices: ['Delete first, then archive from the trash', 'Archive, verify, then delete - if the archive fails the delete must not run', 'Archive and delete in parallel for speed', 'Delete only after the TTL policy confirms'],
+        answer: 1,
+        why: 'TTL is a cache policy, not a data policy - the same sentence the TTL deletes are eventual node rests on. Ordering is the whole design: cache expiry must never destroy history.' },
     ],
     evidence: ['quotes-api/backend/archiver.py', 'internal estate notes'] },
 
@@ -155,6 +261,12 @@ export const NODES = [
       'The AWS translation is ECR, lifecycle policies included - I already run one, so that answer is a story, not a definition.',
       'Inconsistency I name first: the frontend still tags gcr.io while backend and backend2 use Artifact Registry, and free-tier-refresh also still tags gcr.io. Standardizing is on the list.',
     ],
+    quiz: [
+      { q: 'The NWF shadow preflight job was deployed by immutable image digest instead of a tag. What does that pin, connecting this node to Revisions and rollback?',
+        choices: ['The image scan results, so vulnerabilities are frozen', 'The registry bill, so storage stops growing', 'The build cache, so rebuilds are faster', 'Exactly which image ran - a digest cannot move the way a mutable tag can, so the smoke check tested a known artifact'],
+        answer: 3,
+        why: 'Tags are pointers; digests are identity. Immutability is what makes rollback a traffic switch on Cloud Run, and it is also what makes a preflight provable. The keep-N cleanup policy then stops immutability from becoming a storage bill.' },
+    ],
     evidence: ['internal estate notes', 'quotes-api/backend/cloudbuild.yaml'] },
 
   { id: 'ds-supabase', type: 'datastore', label: 'Supabase (web-app)',
@@ -163,6 +275,12 @@ export const NODES = [
       'Different product, different shape: a sharded full-universe scan - 954 tickers across 4 shards - runs on GHA cron with workflow_dispatch inputs and dry_run gates, storing to Supabase. No Cloud Run needed.',
       'The concurrency story: concurrency groups with cancel-in-progress false for pipeline writes, because cancelling a run mid-write is worse than a delay; the opposite choice for CI, where you do want cancellation.',
       'The translation answer if asked: Supabase is hosted Postgres with an API layer - on AWS that is RDS or Aurora behind API Gateway, and the sharded scan would be EventBridge plus Lambda or Fargate tasks. Different vendor, same shapes as the rest of the estate.',
+    ],
+    quiz: [
+      { q: 'A sharded full-universe scan on GHA cron uses concurrency groups with cancel-in-progress false. What is the reasoning, and which scheduler does this portal pipeline not need?',
+        choices: ['Supabase charges per cancelled run, so it needs Lambda', 'Cancelling a run mid-write is worse than a delay, so pipeline writes queue - and a hosted Postgres plus cron means no Cloud Run service at all', 'Cancellation corrupts the workflow YAML, so it needs Cloud Run', 'GitHub forbids cancelling scheduled runs, so it needs EventBridge'],
+        answer: 1,
+        why: 'The setting follows the blast radius of interruption: data pipelines queue, CI cancels. The NWF-family scan shows the shape: 954 tickers across 4 shards, dry-run gates, and not one server to deploy.' },
     ],
     evidence: ['web-app/.github/workflows/quotes-scan.yml', 'internal estate notes'] },
 
@@ -176,6 +294,16 @@ export const NODES = [
       'Known footguns from my own incident log: a missing skip_ai=true query param drained the shared free-tier Gemini quota and caused two days of stale content; a dead job URI means jobs fire silently into the void.',
       'Cost trivia worth knowing: three jobs per billing account are free, and each beyond that is billed at ten cents per job per month. The consolidation recommendation - many jobs down to one dispatcher - saves the per-job fees and removes moving parts.',
     ],
+    quiz: [
+      { q: 'Scheduler logs 13 DEADLINE_EXCEEDED while the backend logs 13 times 200. Before changing anything, which node tells you what is actually happening?',
+        choices: ['Scale-to-zero and cold starts: the retries were cold starts', 'Revisions and rollback: two revisions split the traffic', 'TTL deletes are eventual: the retries were expired messages', 'Scheduler attempt deadline vs backend work: both logs are true and measure different things - the caller gives up before the worker finishes'],
+        answer: 3,
+        why: 'Write down who gives up first in every caller-callee pair: Scheduler attempt deadline, Cloud Run request timeout, vendor client timeout. If those numbers are not ordered deliberately, the system invents its own order.' },
+      { q: 'NWF runs its twenty-odd pipeline crons on Modal in America/New_York, while this fleet is UTC-scheduled. What operational difference follows at daylight-saving time?',
+        choices: ['Both shift by one hour and nobody notices', 'UTC schedulers auto-detect New York time', 'Modal crons run twice in November to compensate', 'The Modal crons stay on market time because the platform handles DST; a UTC-only scheduler needs the Dual cron plus wall-clock gate trick instead'],
+        answer: 3,
+        why: 'A 4:30 pm market-close job is two different UTC times depending on the season. Either your scheduler understands the timezone, or you schedule both and gate on the wall clock - the GHA dual-cron pattern exists for exactly this.' },
+    ],
     evidence: ['project-wiki/scheduler-jobs-config.md', 'internal estate notes'] },
 
   { id: 'sch-gha-cron', type: 'scheduler', label: 'GitHub Actions cron (cutover)',
@@ -184,6 +312,12 @@ export const NODES = [
       'The migration mechanism is the story: each cron maps to job names, and only jobs listed in the repo variable SLOT1_GHA_JOBS run. Cutting a job over from Cloud Scheduler to GHA means adding the name to the variable and pausing the matching Scheduler job. Rollback is the reverse. Reversible, zero-deploy, per-job - that is release engineering.',
       'GHA cron caveats I can recite: UTC only, minimum interval five minutes, runs can be delayed or dropped under platform load, schedules live on the default branch only, and public repos lose schedules after 60 days of inactivity. Design crons to be safe to miss and safe to run twice.',
       'The daylight-saving trick: the afternoon pipeline schedules both 20:15 and 19:15 UTC, then a gate job checks the wall-clock hour in America/New_York plus weekday, so the off-season entry is a no-op instead of a duplicate run an hour apart.',
+    ],
+    quiz: [
+      { q: 'What makes a Cloud Scheduler to GHA cron cutover reversible and zero-deploy in this estate?',
+        choices: ['Each cron maps to job names gated by a repo variable: add the name and pause the old job to cut over, reverse it to roll back', 'Export the Scheduler config and import it into YAML', 'Delete the Scheduler jobs and hope the workflow runs', 'Rewrite every endpoint to read a feature flag header'],
+        answer: 0,
+        why: 'The NWF estate uses the same idea one level up: an env flag folds its evening cron stages into one dispatcher without redeploying the job code. Flags over deploys for operational experiments.' },
     ],
     evidence: ['quotes-api/.github/workflows/slot1-scheduler.yml', 'study notes'] },
 
@@ -194,6 +328,16 @@ export const NODES = [
       'News enters the confluence score at weight 0 - shadow mode - until measured delta-IC proves it helps. Shipping a signal at weight zero and promoting it on evidence is the answer to "how do you prove a model works before it affects users".',
       'The rate-budget story lives here: before each Alpaca call, jobs reserved a token from the DynamoDB counter - until a later cleanup PR removed it from source. Say the shared cap is gone and why, rather than presenting it as current. That sentence is what "I keep my story accurate" sounds like.',
     ],
+    quiz: [
+      { q: 'NWF Modal jobs run under retries of max 3 with exponential backoff, and each stage is a thin wrapper over a plain, unit-tested entrypoint. What does the thin-wrapper rule buy when a stage fails?',
+        choices: ['Unit tests run inside Modal so failures reproduce locally', 'The retry re-invokes the same tested code path - there is no Modal-specific logic that only runs in production', 'The wrapper converts exceptions into HTTP 200s', 'Retries skip the entrypoint and replay cached output'],
+        answer: 1,
+        why: 'This is ledger-api core.py one layer up: keep the platform at the edges. When the platform retries, you want it re-running boring tested Python, not wrapper glue.' },
+      { q: 'The ingest stage commits a Modal Volume and the signals stage reloads it before reading. What race does that prevent?',
+        choices: ['Two signals stages claiming the same run key', 'The cron firing while the market is closed', 'The signals stage reading bars that ingest wrote but that are not yet visible to its container - commit publishes, reload observes', 'The volume filling its quota mid-run'],
+        answer: 2,
+        why: 'Shared-state visibility is a pipeline-wide concern, the same family as DynamoDB TTL reads filtering on expires_at: a write existing and a write being visible are different events, and the code says which one it needs.' },
+    ],
     evidence: ['news-portal/docs/aws-modal-pipeline-notes.md', 'study notes'] },
 
   { id: 'sch-pubsub-trigger', type: 'scheduler', label: 'Pub/Sub daily-analysis-trigger',
@@ -202,6 +346,12 @@ export const NODES = [
       'Pub/Sub versus Cloud Tasks is a classic: Pub/Sub is fan-out, Tasks is targeted with rate limiting and per-task retry. Here the decoupling goal - cron fires, long job runs elsewhere - fits Pub/Sub.',
       'What breaks on duplicate delivery and how you prevent it: idempotent handler keys, and a dead-letter topic plus alert for poison messages. I would add the DLQ; saying what I would add is fine when I say it as such.',
       'AWS translation: Pub/Sub is SNS and SQS in one service; on AWS you choose fan-out or queue explicitly.',
+    ],
+    quiz: [
+      { q: 'What belongs next to a Pub/Sub-triggered long job before it goes production-critical?',
+        choices: ['A dead-letter topic plus an alert, and an idempotent handler keyed so duplicate delivery is harmless', 'A shorter ack deadline so retries come faster', 'Ordering keys on every message', 'A second publisher for redundancy'],
+        answer: 0,
+        why: 'The NWF estate reaches the same place with different machinery: its council debates fan out through a queue with spawned workers, and every job claims a run key first. Fan-out plus idempotent consumers is the shape on any platform.' },
     ],
     evidence: ['study notes'] },
 
@@ -213,6 +363,12 @@ export const NODES = [
       'The cost shadow: revisions keep their images in the registry. dozens of stale revisions were several GiB and a visible share of the bill until pruned - immutability plus hygiene, both halves matter.',
       'AWS translation: task definition revisions on ECS. Same immutability idea, different names.',
     ],
+    quiz: [
+      { q: 'Rollback on Cloud Run is a traffic switch because revisions are immutable. Which incident shows the bill side of that same immutability?',
+        choices: ['Billing outage took Cloud Run down: billing state is not service state', 'free-tier-refresh 4 of 4 Mondays failed: stderr was not captured', 'IDOR derive customer id server-side: identity came from the client', 'Stale revisions pruned: dozens of revisions kept several GiB of images until a prune plus a keep-N cleanup policy fixed it'],
+        answer: 3,
+        why: 'Every feature answer should name its shadow: the immutability that makes rollback instant also makes storage grow forever. Ship a retention policy with every immutability feature.' },
+    ],
     evidence: ['internal estate notes'] },
 
   { id: 'c-minscale', type: 'concept', label: 'minScale is a bill, not a setting',
@@ -221,6 +377,12 @@ export const NODES = [
       'The four-beat answer: min instances keep warm capacity (claim); a warm instance bills continuously under request-based pricing because CPU is allocated (mechanism); in my estate it was most of the spend, and setting it to zero dropped the floor to a few cents (evidence); the trade is 5-15 second cold starts, acceptable because the dominant callers are latency-insensitive schedulers, softened by startup-cpu-boost (trade-off).',
       'The second-order effect is the senior detail: scaling to zero thinned the timeout margin on two already-marginal scheduler jobs. Every config change has a second-order effect - that sentence alone has won me credibility.',
       'The follow-up that separates memorized from lived: what would make you turn minScale back on? A user-facing latency SLO on a hot path - the day a user-facing checkout p95 matters, I pay for warmth and call it an insurance premium, with the number written down.',
+    ],
+    quiz: [
+      { q: 'Setting min-instances to zero dropped the modeled floor to a few cents, but thinned the timeout margin on two scheduler jobs. Which node does that second-order effect connect to?',
+        choices: ['OIDC invocation vs shared bearer secret: cold services re-auth', 'Artifact Registry: cold services push more images', 'Scheduler attempt deadline vs backend work: a colder service makes a marginal deadline miss more likely', 'Pub/Sub daily-analysis-trigger: cold services skip messages'],
+        answer: 2,
+        why: 'Every config change has a second-order effect. The NWF API answers the same question the other way - one warm container with a scaledown window - because its caller is a user, not a cron.' },
     ],
     evidence: ['internal estate notes'] },
 
@@ -231,6 +393,12 @@ export const NODES = [
       'When cold starts are fine: the dominant caller is a scheduler, not a user. Latency-insensitive callers plus cpu-boost equals a seven-cent floor. When the caller is a user on a checkout page, you pay for min-scale and call it an insurance premium.',
       'The verify-before-you-say-it habit: cold start numbers move with runtime and image size, so mine are dated - 5 to 15 seconds as of the September audit on python:3.11-slim. If an interviewer presses for current numbers, the honest move is how I would measure: Cloud Logging trace timestamps on cold revisions.',
     ],
+    quiz: [
+      { q: 'Why can the estate tolerate 5-15 second cold starts on its services while a user-facing API cannot?',
+        choices: ['startup-cpu-boost removes cold starts entirely', 'Schedulers retry until the service is warm', 'Cold starts only happen once per day', 'The dominant callers are latency-insensitive schedulers; the day a checkout p95 matters, warmth is an insurance premium with the number written down'],
+        answer: 3,
+        why: 'Same decision, opposite answer, in the NWF Modal API: min_containers 1 with a ten-minute scaledown window, because a human waits on that p95. Connects directly to minScale is a bill, not a setting.' },
+    ],
     evidence: ['internal estate notes'] },
 
   { id: 'c-set-secrets', type: 'concept', label: '--set-secrets replaces the whole set',
@@ -239,6 +407,12 @@ export const NODES = [
       'The near-miss: cloudbuild.yaml bound GEMINI_API_KEY but not the hand-added OPENROUTER_API_KEY. The next deploy would have silently dropped OpenRouter. Caught in the September audit by treating the cloudbuild secrets line as a live-config diff against reality.',
       'Rotation done safely: add a new secret version, deploy a new revision so :latest resolves fresh, verify, disable the old version, destroy it later. Env-var secrets are fixed for the life of an instance - rotation needs a new revision to take effect. Volume-mounted secrets can refresh without one.',
       'The 401 signature: an OpenRouter 401 in the logs is the exact symptom of a stale or wrong secret value; a Finnhub 401 was the same shape. "Secret changed or never updated, service not redeployed."',
+    ],
+    quiz: [
+      { q: '--set-secrets replaces the whole bound set on deploy. The NWF Modal app scopes secrets per workload - API, jobs and billing get different secret lists. What shared principle do both teach?',
+        choices: ['Secrets should be rotated daily regardless of deploys', 'Treat the secret set as live config and scope it minimally: a deploy can silently drop what it does not name, and no workload should hold secrets it never uses', 'Console-added secrets survive every deploy', 'Every workload should share one secret list for simplicity'],
+        answer: 1,
+        why: 'The September near-miss - a hand-added key about to be dropped by the next deploy - and the NWF API versus jobs versus billing secret split are the same discipline: name your secrets like config, grant them like privileges.' },
     ],
     evidence: ['internal estate notes', 'quotes-api/backend/cloudbuild.yaml'] },
 
@@ -249,6 +423,12 @@ export const NODES = [
       'The contrast that lands in an interview: my direction on GCP (OIDC invocation) is the AWS default (IAM-signed SigV4 requests). Saying "the AWS default is where I am migrating to" shows the map in both vocabularies.',
       'Why the fallback exists: GitHub Actions calls the same endpoints without a Google identity, so the shared secret stays until WIF lands. Every pragmatic compromise should have a named exit.',
     ],
+    quiz: [
+      { q: 'The NWF refresh script pushes its digest to the portal with a shared Bearer secret - the same pattern the scheduler fleet uses today. What is the named exit for both?',
+        choices: ['Longer Bearer secrets rotated quarterly', 'OIDC invocation: tokens minted per call, audience-checked by the backend, nothing static to leak or rotate by hand', 'Moving the secret from env vars into source', 'IP allowlists on the portal endpoint'],
+        answer: 1,
+        why: 'Every pragmatic compromise needs a named exit. The fallback exists because CI calls without a Google identity - which is exactly what Workload Identity Federation removes.' },
+    ],
     evidence: ['quotes-api/backend/cloudbuild.yaml', 'project-wiki/scheduler-jobs-config.md'] },
 
   { id: 'c-concurrency', type: 'concept', label: 'Concurrency 80, and when to tune it down',
@@ -257,6 +437,12 @@ export const NODES = [
       'The 503 mechanism: a burst of /quotes calls waited on a rate-limited vendor, instances saturated waiting on upstream, and the max-5 cap meant no more capacity. Concurrency times max instances is your real ceiling - 400 requests in flight, all blocked on one vendor.',
       'For CPU-heavy handlers you tune concurrency down so one heavy request does not starve 79 others; for IO-bound proxies you can leave it high. The default is a starting point, not an answer.',
       'The nuance worth adding: concurrency and max instances multiply, so capacity planning is arithmetic, not vibes - 80 times 5 is 400 in-flight requests, and if each waits 2 seconds on a vendor, that is 200 vendor requests per second against a rate limit. The math explains the 503s before any log is opened.',
+    ],
+    quiz: [
+      { q: 'Concurrency 80 times max instances 5 is 400 in-flight requests, each waiting 2 seconds on a vendor - 200 vendor requests per second against a rate limit. Which incident is this arithmetic?',
+        choices: ['Cold-cache thundering herd 429s: vendor 429s cascaded into 503s against the instance cap', '16/20 DEADLINE_EXCEEDED: the Scheduler gave up early', 'minScale was most of the bill: warm capacity cost too much', 'Missing skip_ai drained quota: a param ran the AI bake'],
+        answer: 0,
+        why: 'Capacity planning is arithmetic, not vibes. The NWF API caps concurrency at 50 inputs per container for the same reason: the number you set times the number of containers is the load you offer your slowest dependency.' },
     ],
     evidence: ['study notes'] },
 
@@ -267,6 +453,12 @@ export const NODES = [
       'Three fixes, ordered: return 202 and do the work asynchronously (Cloud Tasks or a Cloud Run Job) - the real fix; raise the attempt deadline - the quick fix; split the fetch into chunks - the workaround. Retry on a non-idempotent handler makes it worse, so idempotency comes first.',
       'The general principle I would state: in any caller-callee pair, write down who gives up first. Scheduler attempt deadline versus Cloud Run request timeout versus the vendor client timeout - if those three numbers are not ordered deliberately, the system invents its own order and it will surprise you.',
     ],
+    quiz: [
+      { q: 'NWF paper-fill-at-open polls for the official open price until 10:40 ET inside a 70-minute job timeout with bounded retries. Which principle from this node is that design applying?',
+        choices: ['Retries should be unbounded until success', 'Polling should stop at the first empty response', 'The vendor timeout should exceed the job timeout', 'Order the timeouts deliberately: poll budget, job timeout and retry count are written down so nothing gives up first by accident'],
+        answer: 3,
+        why: 'In any caller-callee pair, write down who gives up first. The NWF open-fill job is the principle as code: an inner polling deadline nested inside an outer job timeout, wrapped in a retry policy with exponential backoff.' },
+    ],
     evidence: ['internal estate notes', 'study notes'] },
 
   { id: 'c-ttl-eventual', type: 'concept', label: 'TTL deletes are eventual',
@@ -275,6 +467,12 @@ export const NODES = [
       'The invariant: TTL is a storage reclamation policy, not a correctness mechanism. If a read path trusts TTL for freshness, stale data will be served. Every read filters on expires_at; TTL is the cleanup crew.',
       'Why TTL is still worth it: self-cleaning state means no purge job to babysit for the common case. Purge-cache exists as a safety net, archives to Parquet, then deletes - belt and suspenders by design.',
       'A second shared trap worth naming: neither Firestore nor DynamoDB TTL is a compliance deletion mechanism. If data must be gone by a deadline, you delete it explicitly and use TTL as the backstop - the same archive-then-delete ordering as the Parquet pattern.',
+    ],
+    quiz: [
+      { q: 'The NWF market cache table has a native TTL attribute yet every read still filters on expires_at. Why both?',
+        choices: ['The filter saves read capacity units', 'TTL is disabled on free-tier tables', 'TTL deletes are eventual - DynamoDB TTL can lag by days - so TTL is storage reclamation and the read filter is correctness', 'TTL only works on numeric keys'],
+        answer: 2,
+        why: 'Same lesson on both document stores in this estate: Firestore TTL and DynamoDB TTL are cleanup crews, not freshness guarantees. A read path that trusts TTL will serve stale data.' },
     ],
     evidence: ['study notes', 'quotes-api/backend/firestore.py'] },
 
@@ -285,6 +483,16 @@ export const NODES = [
       'The vocabulary upgrade: it retries becomes at-least-once delivery, so the handler is idempotent. Say the mechanism, not the hope.',
       'Failure taxonomy: it broke becomes it degraded - success status with partial payload. midday-quotes is my canonical example; success keyed on coverage, not status code, is the fix.',
     ],
+    quiz: [
+      { q: 'The NWF job runner claims each run with an INSERT ON CONFLICT into job_runs: a fresh running row yields nothing, a failed or stale one gets retaken with attempt plus one. What does this make safe?',
+        choices: ['Reading replicas for reporting queries', 'Autoscaling under vendor rate limits', 'Rollback to any previous revision', 'Modal retries, manual re-runs and duplicate cron fires - every trigger can fire twice and the work still happens once per run key'],
+        answer: 3,
+        why: 'This is at-least-once answered with a mechanism, not a hope: the claim row is the idempotency key, heartbeats distinguish a live worker from a dead one, and a stale claim gets taken over deliberately.' },
+      { q: 'The NWF signals stage is deterministic by key: runs are keyed on date plus engine version, and re-running converges instead of duplicating. Why include the engine version in the key?',
+        choices: ['It disables the ON CONFLICT path entirely', 'The version makes the primary key shorter', 'Older engines run faster with a higher key', 'A code change must produce a fresh run rather than silently updating yesterday outputs - reproducibility per version, convergence within a version'],
+        answer: 3,
+        why: 'Point-in-time correctness for pipelines: the same reason the backtest-bias rep forbids peeking. A backfill with a new engine is new data, and the key says so honestly.' },
+    ],
     evidence: ['study notes', 'quotes-api/backend/feed_refresh.py'] },
 
   { id: 'c-wif', type: 'concept', label: 'Workload Identity Federation (keyless CI auth)',
@@ -293,6 +501,12 @@ export const NODES = [
       'The mechanism: the runner proves its identity to GitHub, GitHub signs an OIDC token, the cloud provider trusts token.actions.githubusercontent.com via a configured pool or OIDC provider, and STS mints short-lived credentials. No JSON key ever exists, so nothing can leak.',
       'Why it is my number-three recommendation: the estate still has a long-lived SA key in CI - the same pattern that caused a credential-exposure incident once. Migrate to workload identity federation, then delete the key.',
       'Both vocabularies: GCP Workload Identity Federation equals AWS IAM OIDC identity provider plus role. Same pattern, same win.',
+    ],
+    quiz: [
+      { q: 'The NWF Terraform slot proposes enabling the Security Token Service API for GitHub Workload Identity Federation, and flags one prerequisite as not yet checked. Which one, and why name it?',
+        choices: ['The DNS API, because tokens resolve hostnames', 'The container API, because WIF pulls images', 'The IAM credentials API must be enabled before a workflow can impersonate the deploy service account - a designed migration names its unverified steps instead of claiming done', 'The billing API, because WIF is billed per token'],
+        answer: 2,
+        why: 'This is the escape hatch from the static service-account key incident: keyless CI auth, designed in Terraform, honest about what has not been applied. Designed-but-verified beats claimed-but-finished.' },
     ],
     evidence: ['news-portal/docs/new-slot-terraform.md', 'quotes-api/.github/workflows/feed-jobs.yml'] },
 
@@ -303,6 +517,12 @@ export const NODES = [
       'This is the quiet cousin of the minScale story: both are "you pay for warmth". The estate runs request-based with scale-to-zero because the workload is scheduler-driven.',
       'The exam-style answer: request-based suits spiky request-driven work; instance-based suits steady load or background processing. My estate is scheduler-driven bursts into a cache, so request-based with scale-to-zero wins - and the day I add websocket streams or workers, that decision gets revisited line by line.',
     ],
+    quiz: [
+      { q: 'A handler kicks off cache warming after responding. What does request-based billing do to that background work, and what are the two honest fixes?',
+        choices: ['The platform kills the instance immediately', 'CPU is throttled after the response; move the work to a job, or pay instance-based billing and admit it', 'The next request inherits the work automatically', 'The work runs free after the response'],
+        answer: 1,
+        why: 'The NWF estate chose the job answer wholesale: twenty-plus cron stages on Modal do the warming, scoring and publishing, so the request path never pretends background work is free.' },
+    ],
     evidence: ['study notes'] },
 
   { id: 'c-deploy-gap', type: 'concept', label: 'The deploy gap: merged is not live',
@@ -311,6 +531,12 @@ export const NODES = [
       'The story: three PRs merged, production unchanged for weeks, and a config-only redeploy made it look fresh. The recurring failure mode across the estate is not bad code - it is code that never shipped. mcp-engine main not even importing is the same disease.',
       'The fix, stated as a plan: Cloud Build trigger or GHA deploy-on-merge for data-api, using WIF not a key, plus a "deployed? Y/N" line on every PR. Boring, mechanical, and the single highest-leverage reliability change.',
       'Interview framing: name your own weakness first. "Here is the gap and the migration path" reads senior; hiding it and getting found out does not.',
+    ],
+    quiz: [
+      { q: 'Three PRs merged, production unchanged for weeks, and a config-only redeploy made it look fresh. What two mechanisms close this gap across the estate?',
+        choices: ['A bigger max-instances cap so deploys matter less', 'Longer PR descriptions listing undeployed changes', 'Monthly manual deploys with a calendar reminder', 'A build trigger or deploy-on-merge workflow using keyless auth, plus a deployed yes-or-no line on every PR'],
+        answer: 3,
+        why: 'The NWF preflight points the same direction from the artifact side: deploy by immutable digest so what runs is pinned. Merged is not live until a machine says so, and the deployed line makes a human check it.' },
     ],
     evidence: ['internal estate notes'] },
 
@@ -322,6 +548,12 @@ export const NODES = [
       'The recommendation that came out of it: enable BigQuery billing export so the next audit reads real SKUs instead of a model. Measurement infrastructure is a deliverable.',
       'What I would do differently: the minScale choice was reasonable when made and silently became the majority of the bill as traffic patterns changed. Config decisions need expiry dates - a quarterly cost review would have caught it a year earlier, which is why the audit exists now.',
     ],
+    quiz: [
+      { q: 'The cost teardown modeled the bill from config, compared it with observed spend, and every bucket got a fix. What process fix came out of it, connecting to BigQuery?',
+        choices: ['Enable billing export so the next audit reads real SKUs instead of a model - measurement infrastructure is a deliverable', 'Move all services to instance-based billing', 'Raise min instances so the model is simpler', 'Delete the cost model after the audit'],
+        answer: 0,
+        why: 'The deeper lesson: the minScale choice was reasonable when made and silently became most of the bill as traffic changed. Config decisions need expiry dates - a quarterly cost review would have caught it a year earlier.' },
+    ],
     evidence: ['internal estate notes'] },
 
   { id: 'i-stale-revisions', type: 'incident', label: 'Stale revisions pruned',
@@ -330,6 +562,12 @@ export const NODES = [
       'The fix has two halves: prune once, then set the lifecycle policy so the problem cannot regrow. A one-time cleanup without a policy is a chore; with a policy it is closed.',
       'This is the cost shadow of revision immutability - the same feature that makes rollback instant makes storage grow forever. Every feature interview answer should name its shadow.',
       'The interview version of the lesson: every immutability feature needs a retention policy shipped with it - revisions, images, secret versions, log buckets. I now treat \'where does this accumulate\' as a launch question, not a cleanup question.',
+    ],
+    quiz: [
+      { q: 'Why is prune-once not enough for stale revisions, and which node holds the durable half of the fix?',
+        choices: ['The durable half is disabling revision history', 'A one-time cleanup without a lifecycle policy is a chore; Artifact Registry holds the keep-5, delete-after-30-day policy so it cannot regrow', 'The durable half is a bigger disk on Cloud Run', 'Revisions expire on their own after 30 days'],
+        answer: 1,
+        why: 'Every immutability feature needs a retention policy shipped with it. Where does this accumulate is a launch question, not a cleanup question.' },
     ],
     evidence: ['internal estate notes'] },
 
@@ -340,6 +578,12 @@ export const NODES = [
       'The guardrail thinking: defaults should be safe for the most frequent caller. If intraday is the common case, skipping the bake should be the default and opting in should be explicit.',
       'The detection gap: two days of stale content means nothing was watching freshness. The fix pattern repeats everywhere in my estate - a freshness-check workflow that fails loudly, because stale data with green dashboards is the worst failure mode.',
     ],
+    quiz: [
+      { q: 'One missing query param ran the AI bake against a shared free-tier quota, and the failure surface was stale content, not an error. What are the two durable fixes?',
+        choices: ['Make the safe option the default for the most frequent caller, and add a freshness check that fails loudly', 'Retry the bake hourly until content changes', 'Buy a bigger quota and document the param', 'Move the param from the query into a header'],
+        answer: 0,
+        why: 'A default parameter with an expensive side effect plus nothing watching freshness equals two days of silent staleness. NWF tracks the same risk on its free-model endpoints with a circuit breaker the API checks before calling out.' },
+    ],
     evidence: ['incident notes', 'internal estate notes'] },
 
   { id: 'i-sectors-dns', type: 'incident', label: 'a portal subdomain silent 404',
@@ -348,6 +592,12 @@ export const NODES = [
       'The lesson: two-system setups fail in the gap between them. Vercel said attached, Cloudflare had no record, and nobody got paged because nothing errored - it just 404d.',
       'The general practice: any change that spans two consoles gets an end-to-end check from the outside - one curl from off-network beats two green dashboards.',
       'The process fix that came out of it: domain changes get a checklist - attach in Vercel, add the DNS record in Cloudflare, then verify from off-network with curl. Three steps, written down, because the gap between two consoles is where this class of bug lives.',
+    ],
+    quiz: [
+      { q: 'Vercel said attached, Cloudflare had no record, and the subdomain 404d silently. What is the general practice that catches this class of bug?',
+        choices: ['Any change spanning two consoles gets an end-to-end check from the outside - one off-network curl beats two green dashboards', 'Use one console for everything', 'Wait 48 hours for propagation before checking', 'Always attach domains before creating DNS'],
+        answer: 0,
+        why: 'Two-system setups fail in the gap between them. The same outside-in habit diagnosed the NWF backend scope bug: live probes against the real URL, not the dashboard, showed 54 ETFs and a 200 wrapped around an error body.' },
     ],
     evidence: ['internal estate notes'] },
 
@@ -358,6 +608,12 @@ export const NODES = [
       'The subtle failure mode: 503s while the console says Ready, because billing state is not service state. Status dashboards measure the platform, not your account.',
       'The deeper design point: feed_refresh.py was written to run anywhere - in the backend, in a GHA runner, on Modal - because it only needs Application Default Credentials and Firestore. Portability written into the code is what made the failover free when the outage arrived.',
     ],
+    quiz: [
+      { q: 'Billing disabled returned 503s while the console said Ready, yet data kept flowing. Which node holds the design that carried the product, and what made it portable?',
+        choices: ['Revisions and rollback - traffic switched to an old revision', 'Cognito - users re-authenticated elsewhere', 'ECR - images were pulled from a second registry', 'Redundant producers, staggered - feed code written to run anywhere with Application Default Credentials and direct Firestore writes ran in a GHA runner when Cloud Run died'],
+        answer: 3,
+        why: 'The NWF local pipeline is the same portability written down: one script that loads env, computes signals and writes Firestore from a laptop. Portability in the code is what makes failover free when the outage arrives.' },
+    ],
     evidence: ['quotes-api/backend/feed_refresh.py', 'study notes'] },
 
   { id: 'i-deadline-mismatch', type: 'incident', label: '16/20 DEADLINE_EXCEEDED vs 13x 200',
@@ -366,6 +622,12 @@ export const NODES = [
       'Walk the timeline out loud: Scheduler fires, backend starts a slow fetch, attempt deadline passes, Scheduler records DEADLINE_EXCEEDED and retries, backend finishes the first attempt with a 200 nobody is listening to, and the retry doubles the upstream load. Retry amplification on a slow endpoint.',
       'The fix I would defend: return 202 immediately and run the fetch as a Cloud Run Job, or chunk the fetch. Raising the deadline treats the symptom.',
       'What made it diagnosable at all: structured JSON logs on the backend and AttemptFinished logs on the Scheduler side. The audit came from reading two log streams against each other - observability you set up before the incident is the only kind that helps during one.',
+    ],
+    quiz: [
+      { q: 'Scheduler records DEADLINE_EXCEEDED and retries while the backend finishes the first attempt with a 200 nobody hears. What does the retry do to upstream load, and what is the real fix?',
+        choices: ['It caches the first 200 for the retry', 'It halves the load by splitting work across attempts', 'It doubles the load on an already slow endpoint - retry amplification - so return 202 and run the work as a job, or chunk the fetch', 'Nothing; retries are free, so raise the deadline forever'],
+        answer: 2,
+        why: 'Retry on a non-idempotent slow handler makes things worse, which is why Idempotency and at-least-once delivery comes first and why NWF bounds its job retries at 3 with exponential backoff.' },
     ],
     evidence: ['internal estate notes'] },
 
@@ -376,6 +638,12 @@ export const NODES = [
       'The fix: key success on coverage - feed_refresh.py now exits non-zero when fewer than 90% of tracked symbols reached the expected trading day, so a green run means the data is current, not merely that the job executed. 0.9 tolerates five stragglers - a delisting, a vendor gap - while failing loudly on a wholesale stall.',
       'Bonus gap found by tracing write to read to UI: a MiddayQuotes component that is never imported - a job writing data nothing reads. Unused jobs burn quota and hide real failures.',
     ],
+    quiz: [
+      { q: 'NWF refresh-signals refuses to publish an empty digest and exits 1; locrun quarantines partial runs under their own day key. Which principle from this incident are both applying?',
+        choices: ['Success is defined by the payload, not the status code - coverage-keyed success means a green run means the data is current', 'Batch writes make partial data acceptable', 'Exit 0 and log a warning for partial runs', 'Always publish something so caches stay warm'],
+        answer: 0,
+        why: '200 with 6 of 54 missing taught the estate to count what matters. The NWF pipeline encodes it twice: no empty publication, and no partial run overwrites the complete one.' },
+    ],
     evidence: ['quotes-api/backend/feed_refresh.py', 'study notes'] },
 
   { id: 'i-static-sa-key', type: 'incident', label: 'Static service-account key in CI',
@@ -384,6 +652,12 @@ export const NODES = [
       'The one-sentence version: that step uses a long-lived key; the right fix is Workload Identity Federation with id-token write; the provisioning path is designed, it is the next hardening item.',
       'Why I take it seriously: this exact pattern already burned me once, and the rotation runbooks exist because rotation is painful. Delete the key class, not the key.',
       'The honest timeline answer: the WIF migration is designed in the new-pipeline Terraform docs - pool, provider, binding - and deliberately not applied yet. In an interview I would rather show a designed-but-verified migration path than claim a finished one.',
+    ],
+    quiz: [
+      { q: 'A CI workflow still authenticates with a long-lived service-account key in repo secrets. What is the fix and its current state in this estate?',
+        choices: ['Rotate the key weekly - already automated', 'Workload Identity Federation with id-token write - designed in the new-pipeline Terraform with pool, provider and binding, deliberately not applied yet', 'Disable CI until the key expires - applied', 'Move the key into the workflow YAML - applied'],
+        answer: 1,
+        why: 'Delete the key class, not the key. Showing a designed-but-unapplied migration path with its prerequisites named - like the NWF slot flagging the IAM credentials API as unchecked - reads senior; claiming finished does not.' },
     ],
     evidence: ['quotes-api/.github/workflows/feed-jobs.yml', 'news-portal/docs/new-slot-terraform.md'] },
 
@@ -394,6 +668,12 @@ export const NODES = [
       'How to talk about an open security question: name the verification step. "Whether the vulnerable shape shipped is unverified; one request against the deployed backend answers it, and the fix is the same either way." Open questions with a named next step read as control, not confusion.',
       'The broader practice: review findings in uncommitted trees still count - the tree is what deploys when someone runs gcloud run deploy --source from a dirty checkout. Which loops back to the deploy gap.',
     ],
+    quiz: [
+      { q: 'Why is IDOR an authorization gap and not an authentication gap, and what is the fix shape the NWF billing routes follow?',
+        choices: ['The client id was malformed; validate its format', 'The token expired; refresh it more often', 'The user is logged in; the endpoint trusted a client-supplied customer id. Derive identity from the server-side session every time', 'The user is not logged in; add a login page'],
+        answer: 2,
+        why: 'NWF applies it concretely: per-user LLM budget rows are keyed by the session user id, never a parameter. Any identity that arrives from the client is a claim, not an identity.' },
+    ],
     evidence: ['generic code-review notes'] },
 
   { id: 'i-free-model-failures', type: 'incident', label: 'free-tier-refresh: 4 of 4 Mondays failed',
@@ -402,6 +682,12 @@ export const NODES = [
       'The meta-lesson: a failure you cannot explain is an observability gap before it is a bug. Add structured error output so a failure explains itself; then fix what it says.',
       'Saying it in three sentences: the job failed four of four runs. Stderr was not captured, so root cause is unknown. First check is the env file; the durable fix is error output that explains itself. Stop. Do not apologize, do not ramble.',
       'The prioritization answer: it is a weekly job feeding a fallback model chain, so the blast radius was small - but four consecutive red Mondays is exactly how alert fatigue starts. Either fix it or silence it deliberately; a cron that is always red trains you to ignore red.',
+    ],
+    quiz: [
+      { q: 'A weekly job exited 1 four Mondays in a row with no stderr captured. What is the meta-lesson, and what is the alert-fatigue warning?',
+        choices: ['A failure you cannot explain is an observability gap first - add error output that explains itself, and either fix the red cron or silence it deliberately', 'Retry the job until it passes, then close the incident', 'Weekly jobs should not capture stderr', 'Four failures prove the job is unneeded'],
+        answer: 0,
+        why: 'A cron that is always red trains you to ignore red. NWF answers the observability half with structured logging and per-environment Sentry init on every job wrapper - a failure should arrive with its own explanation.' },
     ],
     evidence: ['study notes'] },
 
@@ -412,6 +698,12 @@ export const NODES = [
       'Mitigations worth naming: the in-memory LRU in front of Firestore for hot paths, request coalescing so one miss fetches and the rest wait, and backoff with jitter upstream. Any one of them breaks the chain.',
       'The prevention I would build next: stale-while-revalidate on hot cache keys, so a purge never produces a simultaneous miss storm - one request revalidates, the rest serve slightly stale data. Slightly stale beats down.',
     ],
+    quiz: [
+      { q: 'After a cache purge, every instance fetched the rate-limited vendor at once. Which three mitigations each break the chain, and which concept sizes the blast radius?',
+        choices: ['Bigger instance cap, more retries, longer timeouts', 'Smaller cache, no coalescing, fixed-interval retries', 'Daily purges, sequential fetches, no backoff', 'An in-memory LRU in front of Firestore, request coalescing, and backoff with jitter - Concurrency 80 times max instances sets how many requests can stampede'],
+        answer: 3,
+        why: 'The NWF client layer names the same defense in code: a rate-budget counter before vendor calls and a circuit breaker the API checks first. Slightly stale beats down - stale-while-revalidate is the next build.' },
+    ],
     evidence: ['internal estate notes', 'quotes-api/backend/firestore.py'] },
 
   // ── AWS translations: every GCP/Vercel thing said in AWS ────────────────
@@ -421,6 +713,12 @@ export const NODES = [
       'What transfers: container in, HTTPS URL out, per-use billing. What differs: scale-to-zero is native on Cloud Run; Fargate always runs one task, so the floor cost differs - the minScale story does not even exist on Fargate because there is no zero.',
       'Revisions map to task definition revisions; rollback is re-pointing the service at an older task definition. Same immutability, same traffic-switch rollback.',
     ],
+    quiz: [
+      { q: 'What is the one platform difference that makes the minScale bill story not even exist on Fargate?',
+        choices: ['Fargate has no container support', 'Fargate bills per request like Cloud Run', 'Fargate includes free warm capacity', 'Fargate always runs at least one task - there is no scale-to-zero, so there is no zero floor to optimize toward'],
+        answer: 3,
+        why: 'App Runner can pause, which is closer to scale-to-one. The crossover answer: bursty HTTP with long idle gaps is exactly where Cloud Run native scale-to-zero is the bill difference.' },
+    ],
     evidence: ['internal estate notes'] },
 
   { id: 'aws-eventbridge', type: 'aws', label: 'EventBridge Scheduler',
@@ -429,6 +727,12 @@ export const NODES = [
       'The pairing shape: managed cron to an HTTP, queue, or Lambda target with retry config and deadlines - same mental model both clouds.',
       'The auth contrast that lands: my Scheduler bearer secret migrating to OIDC is the AWS default - EventBridge to API Gateway or Lambda is IAM-signed from day one.',
     ],
+    quiz: [
+      { q: 'How does EventBridge Scheduler pricing change the consolidation math versus Cloud Scheduler?',
+        choices: ['Both charge per job per month identically', 'EventBridge charges per invocation, while Cloud Scheduler gives three free jobs per billing account then bills per job - so the many-jobs-to-one-dispatcher saving is a GCP quirk, not an AWS one', 'EventBridge is always free at any scale', 'Cloud Scheduler charges per invocation instead'],
+        answer: 1,
+        why: 'Same mental model - managed cron plus target plus retries - but the pricing quirks differ, and the auth story flips: EventBridge to Lambda or API Gateway is IAM-signed from day one, which is where the GCP bearer-secret fleet is migrating.' },
+    ],
     evidence: ['internal estate notes'] },
 
   { id: 'aws-codebuild', type: 'aws', label: 'CodeBuild (+ CodePipeline)',
@@ -436,12 +740,24 @@ export const NODES = [
     talkingPoints: [
       'Both are per-repo YAML build definitions running steps in containers. The honest comparison: neither gives you triggers by itself - my GCP gap is no build triggers, and the AWS answer would be CodePipeline wiring. The fix is the same shape on both clouds.',
     ],
+    quiz: [
+      { q: 'cloudbuild.yaml translates to buildspec.yml, but what does neither service give you by itself - the gap behind The deploy gap: merged is not live?',
+        choices: ['Per-repo YAML', 'A registry to push to', 'Triggers: a build definition is not a pipeline - GCP needs a Cloud Build trigger or GHA deploy-on-merge, AWS needs CodePipeline wiring', 'Container support'],
+        answer: 2,
+        why: 'The honest comparison: both are per-repo YAML running steps in containers, and both leave merged-but-not-live possible until somebody wires the trigger. The fix is the same shape on both clouds.' },
+    ],
     evidence: ['internal estate notes'] },
 
   { id: 'aws-ecr', type: 'aws', label: 'ECR',
     summary: 'The Artifact Registry translation. Lifecycle policies exist on both - the keep-5, delete-30-day rule I run ports directly.',
     talkingPoints: [
       'One-liner: image registry with lifecycle policies; my keep-5, delete-30-day rule is the same config on ECR. The 62-stale-revisions story is portable evidence that I have run registry hygiene for real.',
+    ],
+    quiz: [
+      { q: 'What ports directly from Artifact Registry hygiene to ECR?',
+        choices: ['Lifecycle policies: the keep-5-newest, delete-older-than-30-days rule is the same config on ECR', 'Scale-to-zero', 'Request-based billing', 'Revision immutability'],
+        answer: 0,
+        why: 'The stale-revisions story is portable evidence: image registries accumulate, and a lifecycle policy is what stops cleanup from being a recurring chore on either cloud.' },
     ],
     evidence: ['internal estate notes'] },
 
@@ -451,6 +767,12 @@ export const NODES = [
       'Same discipline both sides: reference secrets at deploy, never plaintext env. My rotation dance - new version, new revision, verify, disable old, destroy later - is the AWS rotation story too, except AWS can automate rotation with Lambda.',
       'Cost nuance: AWS bills per secret-month and per 10k API calls, which is why the GCP audit line "secret versions were 8% of the bill" translates into a hygiene habit, not a surprise.',
     ],
+    quiz: [
+      { q: 'The GCP audit found secret versions were a visible share of the bill. How does AWS Secrets Manager pricing reinforce the same hygiene habit?',
+        choices: ['AWS secrets are free under 10 per account', 'AWS bills per secret-month plus per 10k API calls, so unused versions and chatty retrieval both cost real money', 'AWS bills only on secret creation', 'AWS bills per character of secret value'],
+        answer: 1,
+        why: 'Same discipline both sides: reference at deploy, never plaintext env, and rotation as a staged dance - new version, new revision, verify, disable old, destroy later. AWS can automate the rotation with Lambda; the shape is identical.' },
+    ],
     evidence: ['internal estate notes', 'study notes'] },
 
   { id: 'aws-dynamodb-x', type: 'aws', label: 'DynamoDB (as Firestore translation)',
@@ -458,6 +780,12 @@ export const NODES = [
     talkingPoints: [
       'The cache-first design ports directly: document model, per-operation pricing, TTL expiry. Firestore TTL and DynamoDB TTL share the same trap - deletes are eventual, reads must filter.',
       'RCU/WCU math for the capacity question: one RCU is a strongly consistent read up to 4 KB per second; one WCU is a write up to 1 KB per second. 150 two-KB writes per second is 300 WCU - on-demand, or provisioned with headroom.',
+    ],
+    quiz: [
+      { q: '150 writes of 2 KB per second need how much write capacity, and how does the NWF mirror design answer the same capacity question?',
+        choices: ['1500 WCU, because reads count double', '150 WCU, because KB do not round up', '300 WCU - one WCU is a 1 KB write per second - and the NWF tables stay provisioned at or under the permanent 25 RCU and 25 WCU free-tier ceiling in total', '75 WCU, because writes batch by two'],
+        answer: 2,
+        why: 'RCU and WCU math is the capacity interview question, and the NWF DynamoDB layer is the lived version: four tables, provisioned capacity chosen to fit the free tier, with an explicit tradeoff note that on-demand would be safer under burst.' },
     ],
     evidence: ['study notes', 'internal estate notes'] },
 
@@ -467,6 +795,12 @@ export const NODES = [
       'My 7-day-Nearline, 30-day-delete rule on the Parquet archive is S3 lifecycle to Standard-IA then Glacier - same policy, different names.',
       'The static-site answer: Netlify or a bucket website translates to S3 plus CloudFront; static-site would move in an afternoon.',
     ],
+    quiz: [
+      { q: 'The Parquet archive rule - Nearline at 7 days, delete at 30 - translates to S3 as what, and why does strong read-after-write consistency matter for the archive-then-delete ordering?',
+        choices: ['Presigned URLs then CloudFront, consistency only affects lists', 'Lifecycle transition to Standard-IA then Glacier - and strong consistency means the verify step after the archive write can trust its read before the delete runs', 'S3 Object Lock then replication, consistency slows deletes', 'Multipart upload then versioning, consistency does not matter'],
+        answer: 1,
+        why: 'Archive, verify, then delete only works if verify reads what you just wrote. The 7-day and 30-day numbers are the same policy shape on both clouds - storage classes with lifecycle rules.' },
+    ],
     evidence: ['internal estate notes', 'study notes'] },
 
   { id: 'aws-sns-sqs', type: 'aws', label: 'SNS / SQS',
@@ -474,12 +808,24 @@ export const NODES = [
     talkingPoints: [
       'The decision framing: Pub/Sub collapses the choice; AWS makes it explicit. Fan-out to many consumers is SNS; work-queue semantics with visibility timeout and dead-letter queue is SQS. My daily-analysis-trigger maps to SNS.',
     ],
+    quiz: [
+      { q: 'Pub/Sub collapses a choice AWS makes explicit. Which service takes which half, and where does the daily-analysis-trigger land?',
+        choices: ['Both halves are Kinesis - it maps to Kinesis', 'SNS for fan-out to many consumers, SQS for work-queue semantics with visibility timeout and DLQ - the daily-analysis-trigger maps to SNS', 'Both halves are SQS - it maps to EventBridge', 'SQS for fan-out, SNS for queues - it maps to SQS'],
+        answer: 1,
+        why: 'The NWF estate has the same fork in a third vocabulary: Modal Queues for council debate events versus spawned function calls for targeted work. Fan-out versus queue is a design decision on every platform.' },
+    ],
     evidence: ['study notes'] },
 
   { id: 'aws-lambda', type: 'aws', label: 'Lambda',
     summary: 'The Cloud Functions translation: event sources off topics and queues, 15-minute cap, cold starts, concurrency limits.',
     talkingPoints: [
       'Direct mapping, including event triggers off SNS and SQS. The 15-minute cap is the constraint that shapes designs - my long-running refresh work moving to Cloud Run Jobs would become ECS scheduled tasks, not Lambda.',
+    ],
+    quiz: [
+      { q: 'Which estate workload would not fit Lambda 15-minute cap, and where would it go instead?',
+        choices: ['Lambda has no time cap on paid tiers', 'The long-running refresh jobs doing 100-170 seconds of work would be fine, but the multi-minute ingestion and scoring stages map to ECS scheduled tasks - the same reasoning that moved them to Cloud Run Jobs and Modal', 'Only static sites exceed 15 minutes', 'Every Cloud Run service fits Lambda unchanged'],
+        answer: 1,
+        why: 'The 15-minute cap is the constraint that shapes designs. NWF sets its ingest and signals stages at 30 to 70-minute timeouts on Modal - those are tasks, not functions, on AWS too.' },
     ],
     evidence: ['study notes'] },
 
@@ -489,12 +835,24 @@ export const NODES = [
       'Same pattern as GCP WIF, same win: keyless CI auth. The trust policy says who may assume the role - scoped to repo and branch; the permissions policy says what they may do.',
       'IAM evaluation in one breath: explicit deny beats allow, default is deny; identity policies, resource policies, permission boundaries, SCPs. The confused-deputy fix is aws:SourceArn and aws:SourceAccount conditions.',
     ],
+    quiz: [
+      { q: 'In the keyless CI pattern, what do the trust policy and the permissions policy each say?',
+        choices: ['The trust policy lists API quotas; the permissions policy lists users', 'The trust policy encrypts tokens; the permissions policy signs them', 'The trust policy says who may assume the role - scoped to repo and branch via the GitHub OIDC provider; the permissions policy says what they may do', 'They are two names for the same policy'],
+        answer: 2,
+        why: 'This is the AWS twin of Workload Identity Federation - the NWF Terraform slot enables the STS API on the GCP side for exactly this exchange. Keyless CI auth, both vocabularies, one pattern.' },
+    ],
     evidence: ['study notes', 'internal estate notes'] },
 
   { id: 'aws-cloudwatch', type: 'aws', label: 'CloudWatch (+ CloudTrail)',
     summary: 'The Cloud Logging and Monitoring translation: logs, metrics, alarms to SNS. CloudTrail is the audit log - who did what.',
     talkingPoints: [
       'My three alert policies on scheduler failures are CloudWatch alarms to SNS on the other side. The four golden signals - latency, traffic, errors, saturation - are vocabulary that works in any cloud.',
+    ],
+    quiz: [
+      { q: 'Which incident shows why log streams and status pages are not enough, and what is the CloudWatch-side vocabulary for the same practice?',
+        choices: ['Stale revisions pruned - CloudWatch bills by image count', 'a portal subdomain silent 404 - CloudTrail alone would have caught it', 'IDOR derive customer id server-side - alarms replace authz', '16/20 DEADLINE_EXCEEDED versus 13x 200 - two true logs measuring different things, found by reading streams against each other; on AWS that is CloudWatch logs, metrics and alarms, with CloudTrail as the audit log'],
+        answer: 3,
+        why: 'Observability you set up before the incident is the only kind that helps during one. NWF wires Sentry per environment plus structured logging into every job wrapper for the same reason: a failure should explain itself.' },
     ],
     evidence: ['internal estate notes', 'study notes'] },
 
@@ -503,12 +861,24 @@ export const NODES = [
     talkingPoints: [
       'The mobile auth chain - Clerk in front, Identity Platform as Google OAuth behind - becomes Clerk in front of Cognito, or Clerk alone. Abstraction layers exist so this answer can be short.',
     ],
+    quiz: [
+      { q: 'What is the honest translation of the mobile app auth chain, and why can the answer be short?',
+        choices: ['Cognito user pools with a social IdP - or keep Clerk, because the abstraction layer already isolates the provider choice', 'IAM users per install, because mobile needs AWS keys', 'There is no translation; auth must be rewritten', 'API Gateway keys, because OAuth is deprecated'],
+        answer: 0,
+        why: 'Abstraction layers exist so this answer can be short. The NWF mobile surface is a Clerk front with one Google OAuth provider behind it - swapping the provider behind the abstraction is a config conversation, not a rewrite.' },
+    ],
     evidence: ['internal estate notes'] },
 
   { id: 'aws-aurora', type: 'aws', label: 'Aurora Serverless v2',
     summary: 'The Neon Postgres translation: serverless Postgres on AWS, or plain RDS. Serverless Postgres exists on both sides; the choice is branching and price.',
     talkingPoints: [
       'What I would actually miss from Neon is branching - the ephemeral database per CI run. Aurora clones get you partway; the workflow would need rebuilding. A translation table that includes what does not translate is the honest one.',
+    ],
+    quiz: [
+      { q: 'What would not translate cleanly from Neon to Aurora Serverless v2, and which GHA pattern depends on it?',
+        choices: ['Autoscaling; Aurora cannot scale to zero', 'SQL syntax; the integration tests would need rewriting', 'Branching - the ephemeral database per CI run; Aurora clones get partway, and the ephemeral Neon branch per test run workflow would need rebuilding', 'Backups; Aurora has no snapshot feature'],
+        answer: 2,
+        why: 'A translation table that includes what does not translate is the honest one. Branch-per-run is hermetic Postgres at no extra infrastructure cost, and it is the feature doing real work in the portal CI.' },
     ],
     evidence: ['internal estate notes'] },
 
@@ -519,6 +889,12 @@ export const NODES = [
       'The problem: "3:15 pm New York year-round" is two different UTC times depending on the season. Two cron entries plus a wall-clock gate in the runner solves it with zero external state.',
       'The general principle: make the wrong run harmless rather than trying to make the schedule perfect. Idempotent, gated, safe to run twice.',
     ],
+    quiz: [
+      { q: 'GHA cron is UTC-only, so the afternoon pipeline schedules 20:15 and 19:15 UTC with a wall-clock gate. How does the NWF Modal backend solve the same problem with zero gates?',
+        choices: ['It converts New York time to UTC at runtime', 'It runs every stage twice and dedupes manually', 'Its crons are declared in America/New_York and the platform handles DST - the gate trick is only needed when the scheduler cannot speak the local timezone', 'It disables crons during DST transitions'],
+        answer: 2,
+        why: 'Same goal, two mechanisms: make the wrong run harmless with a gate, or pick a scheduler that understands market time. The general principle survives both: idempotent, gated, safe to run twice.' },
+    ],
     evidence: ['study notes'] },
 
   { id: 'gha-slot1-flag', type: 'gha', label: 'Feature-flag cutover via repo variable',
@@ -527,12 +903,24 @@ export const NODES = [
       'Why this is a strong story: it is a reversible migration mechanism, not a big-bang rewrite. Per-job cutover, instant rollback, and the flag lives in repo config so it is auditable and changeable without a code change.',
       'The verify step I run before quoting it: gh variable list shows SLOT1_GHA_JOBS with the current comma list; gh run list --workflow slot1-scheduler.yml shows recent status.',
     ],
+    quiz: [
+      { q: 'What do the SLOT1_GHA_JOBS repo variable and the NWF CRON_CONSOLIDATE env flag have in common as operations tools?',
+        choices: ['Both pin action versions to SHAs', 'Both store secrets for the pipeline', 'Both disable workflows on forks', 'Both move an operational change into config instead of a deploy - reversible cutovers and cron consolidation you can flip and flip back'],
+        answer: 3,
+        why: 'Feature flags are not just for product: per-job scheduler cutover and evening-cron consolidation are release engineering - auditable, reversible, and changeable without shipping code.' },
+    ],
     evidence: ['quotes-api/.github/workflows/slot1-scheduler.yml', 'study notes'] },
 
   { id: 'gha-concurrency', type: 'gha', label: 'Concurrency groups: cancel vs queue',
     summary: 'concurrency group afternoon-pipeline with cancel-in-progress false: finish the in-flight run and queue the next. For CI the opposite - cancel stale runs.',
     talkingPoints: [
       'The reasoning: cancelling a pipeline run that is mid-write is worse than a delay; data pipelines queue, CI cancels. The setting follows the blast radius of interruption.',
+    ],
+    quiz: [
+      { q: 'When do you want cancel-in-progress false, and when true - and what decides?',
+        choices: ['False on weekdays, true on weekends', 'False for data pipelines, because cancelling mid-write is worse than a delay; true for CI, where stale runs waste minutes - the blast radius of interruption decides', 'Always false: cancelling is always dangerous', 'Always true: fresh code should always win'],
+        answer: 1,
+        why: 'The NWF-family sharded scan queues its write runs exactly this way, while its job-level safety net is the job_runs claim: even if two runs overlap, the idempotency guard decides who owns the run key.' },
     ],
     evidence: ['study notes'] },
 
@@ -542,6 +930,12 @@ export const NODES = [
       'The sentence: scheduled jobs have no human watching; the failure notification IS the monitoring. Least-privilege permissions make it safe - default contents read, and only the notify job elevates to issues write.',
       'Pairs with payload-defined success: the midday-quotes lesson applied to CI itself.',
     ],
+    quiz: [
+      { q: 'Why does a scheduled workflow open a GitHub issue on failure, and which NWF job plays the same role from inside the pipeline?',
+        choices: ['Issues are cheaper than emails, and NWF sends none', 'GitHub requires issues for audit, and NWF logs to S3', 'It pages the on-call phone, and NWF calls twice', 'No human watches a cron, so the notification IS the monitoring - the NWF backfill-gaps stage posts alerts on rebuild mismatches instead of failing silently'],
+        answer: 3,
+        why: 'Pairs with payload-defined success: a green run must mean the data is current, and a red run must reach a human. Least-privilege permissions keep the notify job safe - only it gets issues write.' },
+    ],
     evidence: ['study notes'] },
 
   { id: 'gha-neon-branch', type: 'gha', label: 'Ephemeral Neon branch per test run',
@@ -550,12 +944,24 @@ export const NODES = [
       'Why it matters: shared test databases are where CI flakes are born. Branch-per-run is hermetic Postgres at no extra infrastructure cost - the branching feature doing real work.',
       'The fork detail: steps are gated so forks without secrets skip cleanly instead of failing red. Respecting the contributor experience is a design choice too.',
     ],
+    quiz: [
+      { q: 'Why does branch-per-test-run beat a shared test database, and what is the fork detail that respects contributors?',
+        choices: ['Shared databases are read-only, and forks run a subset', 'Hermetic real Postgres with zero shared state - no CI flakes from cross-run contamination - and steps are gated so forks without secrets skip cleanly instead of failing red', 'Branches persist test data, and forks skip tests', 'Branches are faster than transactions, and forks get full secrets'],
+        answer: 1,
+        why: 'This is the Neon branching feature doing real work, and it is what Aurora clones only approximate - the one cell in the AWS translation table that does not port cleanly.' },
+    ],
     evidence: ['news-portal/.github/workflows/', 'study notes'] },
 
   { id: 'gha-bot-prs', type: 'gha', label: 'Bot-authored PRs for data refreshes',
     summary: 'peter-evans/create-pull-request opens a PR when the free-model chain changes, so automated config changes are reviewed, not silently committed.',
     talkingPoints: [
       'The principle: automation may propose, humans dispose. A data refresh that changes config opens a PR; the review habit survives the automation.',
+    ],
+    quiz: [
+      { q: 'Why does a data refresh that changes config open a PR instead of committing to main?',
+        choices: ['Config changes are always manual anyway', 'Automation may propose, humans dispose - the review habit survives the automation', 'Bots cannot push to main on any repo', 'PRs are required to trigger the build'],
+        answer: 1,
+        why: 'The NWF estate lives this: its backup fix and model-endpoint changes landed as reviewed PRs, and the secret-scanning and e2e tiers run on every one. Automated change, human gate.' },
     ],
     evidence: ['study notes'] },
 
@@ -565,6 +971,12 @@ export const NODES = [
       'Why staggered and not simultaneous: one vendor-bad day is not hit three times at once, and the later runs can repair the earlier run gaps.',
       'The proof point: when billing took Cloud Run down for two days, GHA ran feed_refresh.py directly in the runner and wrote straight to Firestore. The redundancy was designed, then it was tested by reality.',
     ],
+    quiz: [
+      { q: 'Why are the three producers staggered at 22:00, 23:00 and 23:30 instead of simultaneous, and which incident proved the design?',
+        choices: ['Schedulers forbid overlapping crons - the DNS 404 proved it', 'Simultaneous runs cost three times the quota - the minScale bill proved it', 'Staggering spreads cold starts - the thundering herd proved it', 'One vendor-bad day is not hit three times at once and later runs repair earlier gaps - the billing outage took Cloud Run down for two days and GHA carried the product'],
+        answer: 3,
+        why: 'The NWF local pipeline is the manual fourth producer in the same family: it fetches, computes and writes Firestore directly from a laptop. Redundancy you designed beats redundancy you hoped for.' },
+    ],
     evidence: ['quotes-api/backend/feed_refresh.py', 'study notes'] },
 
   { id: 'gha-oidc', type: 'gha', label: 'permissions: id-token write (keyless cloud auth)',
@@ -573,12 +985,24 @@ export const NODES = [
       'The full chain, both clouds: GITHUB_TOKEN is per-run and scoped by permissions; id-token write lets the job mint an OIDC token; the cloud exchanges it for short-lived credentials. No stored cloud keys anywhere in the loop.',
       'Security hygiene around it: pin third-party actions to a commit SHA not a mutable tag; never run untrusted PR code with secrets - pull_request_target is the classic footgun; secrets are masked in logs but a step that echoes a transformed secret can leak it.',
     ],
+    quiz: [
+      { q: 'What chain turns permissions id-token write into cloud credentials with no stored keys, and where is the NWF estate building it?',
+        choices: ['The job mints a GitHub-signed OIDC token and the cloud exchanges it for short-lived credentials via WIF or AssumeRoleWithWebIdentity - the NWF Terraform slot is wiring this for its deploy service account', 'GitHub stores the cloud key in repo secrets - the NWF slot rotates it', 'The action marketplace provides tokens - the NWF slot pins actions', 'The runner SSHes to the cloud with a deploy key - the NWF slot uses key pairs'],
+        answer: 0,
+        why: 'Same pattern, both clouds, one win: nothing static to leak. Around it: pin third-party actions to commit SHAs, and never run untrusted PR code with secrets - pull_request_target is the classic footgun.' },
+    ],
     evidence: ['study notes'] },
 
   { id: 'gha-cron-caveats', type: 'gha', label: 'Scheduled-workflow caveats',
     summary: 'UTC only; 5-minute minimum interval; runs can be delayed or dropped under platform load; schedules live on the default branch; public repos lose schedules after 60 days idle. Design crons safe to miss and safe to run twice.',
     talkingPoints: [
       'The design consequence: a cron that must not be missed needs a catch-up mechanism - my jobs check what data is due rather than assuming the last run happened. due_jobs() on the Modal tick is exactly that pattern.',
+    ],
+    quiz: [
+      { q: 'Scheduled runs can be delayed or dropped under platform load. What design rule follows, and which NWF stage is the catch-up mechanism in code?',
+        choices: ['Pin workflows to self-hosted runners - NWF runs its own fleet', 'Add more crons as backups - the digest publisher doubles every schedule', 'Never rely on crons at all - NWF polls every minute for everything', 'Design crons safe to miss and safe to run twice - the NWF backfill-gaps job scans the last 10 sessions for missing bars, signals and grades, and re-runs the idempotent stages that own them'],
+        answer: 3,
+        why: 'A cron that must not be missed needs a catch-up: check what data is due rather than assuming the last run happened. Idempotency is what makes re-running the repair safe.' },
     ],
     evidence: ['study notes'] },
 
