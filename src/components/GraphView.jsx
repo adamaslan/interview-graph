@@ -13,16 +13,20 @@ const diamond = r => `M 0 ${-r} L ${r} 0 L 0 ${r} L ${-r} 0 Z`;
  * The force-directed graph. Selection has three tiers with no glow:
  * the selected node is full ink, its neighbors are mid, everything else fades.
  */
-export default function GraphView({ layer, preset, spread, selectedId, onSelect, walkIds }) {
+export default function GraphView({ layer, topic = 'all', preset, spread, selectedId, onSelect, walkIds }) {
   const containerRef = useRef(null);
   const svgRef = useRef(null);
   const simRef = useRef(null);
+  const zoomRef = useRef(null);
   const nodesRef = useRef([]);
+  const selectedRef = useRef(selectedId);
+  selectedRef.current = selectedId;
+  const fitRef = useRef(null);
   const [, setTick] = useState(0);
   const [size, setSize] = useState({ width: 800, height: 600 });
   const labelMinDegree = 4;
 
-  const { nodes, edges } = useMemo(() => layerGraph(layer), [layer]);
+  const { nodes, edges } = useMemo(() => layerGraph(layer, topic), [layer, topic]);
   const walkSet = useMemo(() => new Set(walkIds ?? []), [walkIds]);
 
   // Track container size.
@@ -37,17 +41,17 @@ export default function GraphView({ layer, preset, spread, selectedId, onSelect,
     return () => ro.disconnect();
   }, []);
 
-  // (Re)build the simulation when the layer, preset or size changes.
+  // (Re)build the simulation when the layer, topic-filtered graph, preset or size changes.
   useEffect(() => {
     const pins = loadPins(layer, preset);
+    const prev = new Map(nodesRef.current.map(n => [n.id, n]));
     const simNodes = nodes.map(n => {
       const pin = pins.get(n.id);
-      return {
-        ...n,
-        x: pin?.x ?? size.width / 2 + (Math.random() - 0.5) * 200,
-        y: pin?.y ?? size.height / 2 + (Math.random() - 0.5) * 200,
-        ...(pin ? { fx: pin.x, fy: pin.y } : {}),
-      };
+      const old = prev.get(n.id);
+      // Keep the node's current spot across resizes/rebuilds when it is not pinned.
+      const x = pin?.x ?? old?.x ?? size.width / 2 + (Math.random() - 0.5) * 200;
+      const y = pin?.y ?? old?.y ?? size.height / 2 + (Math.random() - 0.5) * 200;
+      return { ...n, x, y, ...(pin ? { fx: pin.x, fy: pin.y } : {}) };
     });
     const simEdges = edges.map(e => ({ ...e }));
     nodesRef.current = simNodes;
@@ -60,21 +64,67 @@ export default function GraphView({ layer, preset, spread, selectedId, onSelect,
     simRef.current = sim;
     if (reduced) sim.alphaTarget(0).alpha(0.3);
 
+    let fitted = false;
     sim.on('tick', () => {
-      // Keep nodes inside the viewport on narrow screens; pinned nodes stay put.
+      // No hard boundary at the world box: a clamped edge reads as a packed
+      // rectangular ring on dense layers. The simulation's soft containment
+      // force holds the layout near the world; this is only a far backstop
+      // against numerical escape. The settle-fit below measures real extents.
+      const world = sim.world ?? { w: size.width, h: size.height };
+      const BACKSTOP = 250;
       for (const d of simNodes) {
-        const r = radiusOf(d);
-        if (d.fx == null) {
-          // Keep a permanently shown label inside the viewport too: cap x so the
-          // right-anchored label fits (the render falls back to a left anchor).
-          const showLabel = (DEGREE.get(d.id) ?? 0) >= labelMinDegree;
-          const labelW = showLabel ? d.label.length * 6 : 0;
-          let maxX = size.width - r - 4;
-          const fitMaxX = size.width - 2 - r - 5 - labelW;
-          if (labelW && fitMaxX >= r + 4) maxX = fitMaxX; // reserve label room when it can fit
-          d.x = Math.min(Math.max(d.x, r + 4), Math.max(r + 4, maxX));
-        }
-        if (d.fy == null) d.y = Math.min(Math.max(d.y, r + 4), size.height - r - 4);
+        if (d.fx == null) d.x = Math.min(Math.max(d.x, -BACKSTOP), world.w + BACKSTOP);
+        if (d.fy == null) d.y = Math.min(Math.max(d.y, -BACKSTOP), world.h + BACKSTOP);
+      }
+      // Once the layout settles, zoom to fit so dense layers are all visible.
+      if (!fitted && sim.alpha() < 0.08 && simNodes.length > 0) {
+        fitted = true;
+        fitRef.current = (onlyIfNeeded = false) => {
+          // Labels show for hubs plus the selected node and its neighbors - all
+          // of those count toward the fit bounds so nothing renders off-canvas.
+          const labelled = new Set();
+          for (const d of simNodes) {
+            if ((DEGREE.get(d.id) ?? 0) >= labelMinDegree) labelled.add(d.id);
+          }
+          const sel = selectedRef.current;
+          if (sel) {
+            labelled.add(sel);
+            for (const e of simEdges) {
+              const a = typeof e.source === 'object' ? e.source.id : e.source;
+              const b = typeof e.target === 'object' ? e.target.id : e.target;
+              if (a === sel) labelled.add(b);
+              if (b === sel) labelled.add(a);
+            }
+          }
+          let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+          for (const d of simNodes) {
+            const labelW = labelled.has(d.id) ? d.label.length * 6 : 0;
+            const r = radiusOf(d);
+            // Mirror the render-time flip: a label that would overflow the world
+            // edge flips to the node's left.
+            const flip = d.x + r + 5 + labelW > world.w - 2;
+            x0 = Math.min(x0, d.x - r - (flip && labelW ? labelW + 5 : 0));
+            x1 = Math.max(x1, d.x + r + (flip ? 0 : labelW));
+            y0 = Math.min(y0, d.y - r); y1 = Math.max(y1, d.y + r);
+          }
+          const pad = 30;
+          const bw = Math.max(1, x1 - x0 + 2 * pad);
+          const bh = Math.max(1, y1 - y0 + 2 * pad);
+          const k = Math.min(1, size.width / bw, size.height / bh);
+          const tx = (size.width - k * (x0 + x1)) / 2;
+          const ty = (size.height - k * (y0 + y1)) / 2;
+          if (onlyIfNeeded) {
+            // Refit only when a labelled node currently sits outside the view;
+            // leave the user's own pan/zoom alone otherwise.
+            const t = d3.zoomTransform(svgRef.current);
+            const sx0 = t.applyX(x0) - pad, sx1 = t.applyX(x1) + pad;
+            const sy0 = t.applyY(y0) - pad, sy1 = t.applyY(y1) + pad;
+            if (sx0 >= 0 && sy0 >= 0 && sx1 <= size.width && sy1 <= size.height) return;
+          }
+          d3.select(svgRef.current).call(
+            zoomRef.current.transform, d3.zoomIdentity.translate(tx, ty).scale(k));
+        };
+        fitRef.current();
       }
       setTick(t => t + 1);
     });
@@ -85,11 +135,12 @@ export default function GraphView({ layer, preset, spread, selectedId, onSelect,
       .on('zoom', event => {
         svg.select('g.viewport').attr('transform', event.transform);
       });
+    zoomRef.current = zoom;
     svg.call(zoom);
 
     return () => { sim.stop(); svg.on('.zoom', null); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [layer, preset, size.width, size.height]);
+  }, [layer, preset, size.width, size.height, nodes, edges]);
 
   // Live-retune spacing on spread change without rebuilding.
   useEffect(() => {
@@ -98,6 +149,12 @@ export default function GraphView({ layer, preset, spread, selectedId, onSelect,
     applySpacing(sim, { spread, radiusOf, labelMinDegree });
     sim.alpha(0.3).restart();
   }, [spread]);
+
+  // Selecting a node can reveal neighbor labels that sit outside the current
+  // view; refit then, but never hijack a view that already shows them.
+  useEffect(() => {
+    fitRef.current?.(true);
+  }, [selectedId]);
 
   const simNodes = nodesRef.current;
   const nodeEls = new Map();
@@ -201,7 +258,7 @@ export default function GraphView({ layer, preset, spread, selectedId, onSelect,
                       strokeWidth={t === 3 ? 2.5 : 1.5} />
                   )}
                   {shape === 'diamond' && (
-                    <polygon points={diamond(r + 1)} fill={color}
+                    <path d={diamond(r + 1)} fill={color}
                       stroke={t === 3 ? 'var(--select-1)' : 'var(--paper)'}
                       strokeWidth={t === 3 ? 2.5 : 1.5} />
                   )}
@@ -211,7 +268,8 @@ export default function GraphView({ layer, preset, spread, selectedId, onSelect,
                   {((DEGREE.get(d.id) ?? 0) >= labelMinDegree || t >= 2) && (() => {
                     // Flip the label to the node's left when it would overflow the right edge.
                     const labelW = d.label.length * 6;
-                    const flip = (d.x ?? 0) + r + 5 + labelW > size.width - 2;
+                    const worldW = simRef.current?.world?.w ?? size.width;
+                    const flip = (d.x ?? 0) + r + 5 + labelW > worldW - 2;
                     return (
                       <text className="node-label" x={flip ? -(r + 5) : r + 5} y={3}
                         textAnchor={flip ? 'end' : 'start'}>{d.label}</text>

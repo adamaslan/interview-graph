@@ -7,6 +7,7 @@ import { NODES, EDGES, DEGREE, nodeBy } from './data/graphData';
 export const MINUTES_BY_TYPE = {
   service: 6, frontend: 5, datastore: 6, scheduler: 6,
   concept: 5, incident: 4, aws: 3, gha: 4,
+  python: 3, // fundamentals are recall, not stories
   exercise: null, // exercises use their own timeboxMin
 };
 

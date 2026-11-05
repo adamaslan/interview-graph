@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { LAYERS, nodeBy } from './data/graphData';
+import { LAYERS, nodeBy, PYTHON_TOPICS } from './data/graphData';
 import { LAYOUT_PRESETS, SPREAD_MIN, SPREAD_MAX, SPREAD_DEFAULT } from './graph/forces';
 import { loadSpread, saveSpread } from './graph/pins';
 import { buildWalk } from './walk';
@@ -10,6 +10,7 @@ import { useMediaQuery } from './hooks';
 
 export default function App() {
   const [layer, setLayer] = useState('estate');
+  const [topic, setTopic] = useState('all');
   const [preset, setPreset] = useState('free');
   const [spread, setSpread] = useState(() => loadSpread(SPREAD_DEFAULT));
   const [selectedId, setSelectedId] = useState(null);
@@ -53,9 +54,21 @@ export default function App() {
         <nav className="flex flex-wrap gap-1" aria-label="Layers">
           {LAYERS.map(l => (
             <button key={l.id} className={`ctl ${layer === l.id ? 'active' : ''}`}
-              onClick={() => setLayer(l.id)}>{l.label}</button>
+              onClick={() => { setLayer(l.id); setTopic('all'); }}>{l.label}</button>
           ))}
         </nav>
+
+        {layer === 'python' && (
+          <>
+            <span className="mx-1" style={{ color: 'var(--line)' }}>|</span>
+            <nav className="flex flex-wrap gap-1" aria-label="Python topics">
+              {[{ id: 'all', label: 'All topics' }, ...PYTHON_TOPICS].map(t => (
+                <button key={t.id} className={`ctl ${topic === t.id ? 'active' : ''}`}
+                  onClick={() => setTopic(t.id)}>{t.label}</button>
+              ))}
+            </nav>
+          </>
+        )}
 
         <span className="mx-1" style={{ color: 'var(--line)' }}>|</span>
 
@@ -102,6 +115,7 @@ export default function App() {
           {view === 'graph' ? (
             <GraphView
               layer={layer}
+              topic={topic}
               preset={preset}
               spread={spread}
               selectedId={selectedId}
@@ -109,7 +123,7 @@ export default function App() {
               walkIds={walk?.stops.map(s => s.id)}
             />
           ) : (
-            <ListView layerTypes={layerTypes} onSelect={setSelectedId} selectedId={selectedId} />
+            <ListView layerTypes={layerTypes} topic={topic} onSelect={setSelectedId} selectedId={selectedId} />
           )}
         </div>
         {selectedId && (

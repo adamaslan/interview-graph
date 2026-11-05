@@ -1,20 +1,21 @@
 import { useMemo, useState } from 'react';
-import { NODES, DEGREE, TYPE_LABELS } from '../data/graphData';
+import { NODES, DEGREE, TYPE_LABELS, TOPIC_LABELS } from '../data/graphData';
 
 /** Searchable list of every node - the keyboard-first path into the graph. */
-export default function ListView({ layerTypes, onSelect, selectedId }) {
+export default function ListView({ layerTypes, topic = 'all', onSelect, selectedId }) {
   const [query, setQuery] = useState('');
 
   const rows = useMemo(() => {
     const q = query.trim().toLowerCase();
     return NODES
       .filter(n => layerTypes.has(n.type))
+      .filter(n => topic === 'all' || n.type !== 'python' || n.topic === topic)
       .filter(n => !q
         || n.label.toLowerCase().includes(q)
         || n.summary.toLowerCase().includes(q)
         || (n.talkingPoints ?? []).some(tp => tp.toLowerCase().includes(q)))
       .sort((a, b) => (DEGREE.get(b.id) ?? 0) - (DEGREE.get(a.id) ?? 0));
-  }, [query, layerTypes]);
+  }, [query, layerTypes, topic]);
 
   return (
     <div className="panel-scroll h-full overflow-y-auto p-4">
@@ -39,6 +40,7 @@ export default function ListView({ layerTypes, onSelect, selectedId }) {
               onClick={() => onSelect(n.id)}>
               <span className="text-sm font-medium">{n.label}</span>
               <span className="chip ml-2">{TYPE_LABELS[n.type] ?? n.type}</span>
+              {n.type === 'python' && n.topic && <span className="chip ml-1">{TOPIC_LABELS[n.topic] ?? n.topic}</span>}
               <span className="ml-2 text-xs" style={{ color: 'var(--ink-faint)' }}>{DEGREE.get(n.id) ?? 0} links</span>
               <p className="mt-1 line-clamp-2 text-xs" style={{ color: 'var(--ink-soft)' }}>{n.summary}</p>
             </button>

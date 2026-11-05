@@ -16,6 +16,7 @@
   --fam-cloud: #6b5b95;    /* aws equivalents */
   --fam-ci: #7a6c3c;       /* github actions patterns */
   --fam-practice: #9c5a28; /* python live-coding exercises */
+  --fam-python: #4a3f8c;   /* python fundamentals */
   --select-1: #1c1917;
   --select-2: rgba(28, 25, 23, 0.45);
   --select-3: rgba(28, 25, 23, 0.2);
@@ -35,6 +36,7 @@
     --fam-cloud: #b3a6d6;
     --fam-ci: #c3b586;
     --fam-practice: #d69a63;
+    --fam-python: #b0a4e8;
     --select-1: #ede7dc;
     --select-2: rgba(237, 231, 220, 0.45);
     --select-3: rgba(237, 231, 220, 0.2);
