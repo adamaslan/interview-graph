@@ -1,3 +1,4 @@
+import React from 'react';
 import { useEffect, useMemo, useState } from 'react';
 import { EDGE_KINDS, TYPE_LABELS, edgesFor, nodeBy } from '../data/graphData';
 
@@ -5,6 +6,39 @@ import { EDGE_KINDS, TYPE_LABELS, edgesFor, nodeBy } from '../data/graphData';
  * The detail panel. Talking points are written to be spoken. Self-test mode
  * blurs them until you reveal each one - cover, speak, check.
  */
+
+/** One multiple-choice question. Answering locks the choices and shows why. */
+function QuizItem({ item, index }) {
+  const [picked, setPicked] = useState(null);
+  const answered = picked !== null;
+  return (
+    <div className={index > 0 ? 'mt-3' : 'mt-2'}>
+      <p className="text-sm font-medium leading-snug">{index + 1}. {item.q}</p>
+      <div className="mt-1 flex flex-col gap-1">
+        {item.choices.map((choice, ci) => {
+          const isAnswer = ci === item.answer;
+          const isPicked = ci === picked;
+          let style = {};
+          if (answered && isAnswer) style = { borderColor: 'var(--fam-infra)', color: 'var(--fam-infra)', fontWeight: 600, opacity: 1 };
+          else if (answered && isPicked) style = { borderColor: 'var(--fam-fire)', color: 'var(--fam-fire)', opacity: 1 };
+          else if (answered) style = { opacity: 0.55 };
+          return (
+            <button key={ci} type="button" className="ctl text-left" style={style}
+              disabled={answered} onClick={() => setPicked(ci)}>
+              {choice}
+            </button>
+          );
+        })}
+      </div>
+      {answered && (
+        <p className="mt-1 text-xs leading-relaxed" style={{ color: 'var(--ink-soft)' }}>
+          {picked === item.answer ? 'Correct. ' : 'Not quite. '}{item.why}
+        </p>
+      )}
+    </div>
+  );
+}
+
 export default function NodePanel({ nodeId, onSelect, onClose }) {
   const node = nodeBy(nodeId);
   const [selfTest, setSelfTest] = useState(false);
@@ -94,6 +128,16 @@ export default function NodePanel({ nodeId, onSelect, onClose }) {
           })}
         </ol>
       </section>
+
+      {node.quiz?.length > 0 && (
+        <section className="rounded-md border p-3" style={{ borderColor: 'var(--line)' }}>
+          <h3 className="text-sm font-semibold">Quick check</h3>
+          <p className="mt-1 text-xs" style={{ color: 'var(--ink-soft)' }}>Answer out loud first, then click.</p>
+          {node.quiz.map((item, qi) => (
+            <QuizItem key={`${node.id}-${qi}`} item={item} index={qi} />
+          ))}
+        </section>
+      )}
 
       {isExercise && node.twists?.length > 0 && (
         <section>
