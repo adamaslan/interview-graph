@@ -4,6 +4,13 @@
 //
 // Node shape: { id, type, label, summary, talkingPoints: [...], evidence: [] }
 // talkingPoints are written to be SPOKEN - claim, mechanism, a number, a trade-off.
+//
+// Quick-check grounding: the graph-connecting quick checks added 2026-11-04 draw on the
+// public NWF Python codebase (nuwrrrld-portal): deploy/modal-backend (modal_app.py,
+// nuwrrrld/db.py, dynamo.py, jobs/runner.py, jobs/signals.py, api/budget.py,
+// llm/client.py, calendar.py), scripts/pipeline (refresh-signals.py, locrun.py),
+// infra/README.md, and docs (gcp-remaining-surface, modal-vs-gcp-signal-coverage).
+// Names stay genericized per the rule above; each question sits on the node its pattern maps to.
 
 export const NODES = [
   // ── Cloud Run services and jobs ─────────────────────────────────────────
@@ -192,13 +199,13 @@ export const NODES = [
       'Open gap: the NDJSON export backup script exists but is manual and unscheduled. The fix is to schedule it via the portal proven nightly GHA pattern.',
     ],
     quiz: [
-      { q: 'The NWF refresh pipeline writes one digest document per day to Firestore and refuses to publish when zero signals were generated, exiting non-zero. Which incident does that guard come from?',
-        choices: ['Stale revisions pruned - old documents were filling the registry', 'midday-quotes: 200 with 6 of 54 missing - success must be defined by the payload, or an empty run blanks the previous good digest', 'a portal subdomain silent 404 - the DNS record was missing', 'minScale was most of the bill - warm capacity cost too much'],
-        answer: 1,
-        why: 'An empty publication would replace the cached good digest with nothing, and a green exit code would hide it. Failing loudly on empty output is payload-defined success applied to a batch write.' },
+      { q: 'The NWF refresh pipeline writes one digest document per day to Firestore and refuses to publish when zero signals were generated, exiting non-zero. Which incident illustrates the same failure pattern this guard prevents?',
+        choices: ['a portal subdomain silent 404 - the DNS record was missing', 'minScale was most of the bill - warm capacity cost too much', 'midday-quotes: 200 with 6 of 54 missing - success must be defined by the payload, or a green run hides bad data', 'Stale revisions pruned - old documents were filling the registry'],
+        answer: 2,
+        why: 'An empty publication would replace the cached good digest with nothing, and a green exit code would hide it. Whether or not this guard was written because of that incident, both encode the same pattern: failing loudly on empty output is payload-defined success applied to a batch write.' },
       { q: 'The NWF local pipeline writes five collections in one Firestore batch and gives partial runs their own -partial-HHMMSS day key instead of the plain date key. Why?',
-        choices: ['So a partial run can never replace the complete publication for that day - atomic batch plus a completeness-keyed document id', 'Because the TTL policy needs unique keys to expire', 'Because Firestore rejects duplicate document ids', 'Because partial runs are cheaper under per-operation billing'],
-        answer: 0,
+        choices: ['Because the TTL policy needs unique keys to expire', 'Because partial runs are cheaper under per-operation billing', 'Because Firestore rejects duplicate document ids', 'So a partial run can never replace the complete publication for that day - atomic batch plus a completeness-keyed document id'],
+        answer: 3,
         why: 'This is idempotency with a blast-radius guard: re-running the complete pipeline converges onto the same key, while an incomplete run is quarantined. Same lesson as Idempotency and at-least-once delivery.' },
     ],
     evidence: ['quotes-api/backend/firestore.py', 'quotes-api/backend/price_store.py', 'quotes-api/backend/archiver.py'] },
@@ -484,13 +491,13 @@ export const NODES = [
       'Failure taxonomy: it broke becomes it degraded - success status with partial payload. midday-quotes is my canonical example; success keyed on coverage, not status code, is the fix.',
     ],
     quiz: [
-      { q: 'The NWF job runner claims each run with an INSERT ON CONFLICT into job_runs: a fresh running row yields nothing, a failed or stale one gets retaken with attempt plus one. What does this make safe?',
-        choices: ['Reading replicas for reporting queries', 'Autoscaling under vendor rate limits', 'Rollback to any previous revision', 'Modal retries, manual re-runs and duplicate cron fires - every trigger can fire twice and the work still happens once per run key'],
-        answer: 3,
-        why: 'This is at-least-once answered with a mechanism, not a hope: the claim row is the idempotency key, heartbeats distinguish a live worker from a dead one, and a stale claim gets taken over deliberately.' },
+      { q: 'The NWF job runner claims each run with an INSERT ON CONFLICT into job_runs: a fresh running row yields nothing, a failed or stale one gets retaken with attempt plus one. What does this guard actually provide?',
+        choices: ['One owner per run key at a time across retries, re-runs and duplicate cron fires - replay stays safe only because the stages themselves write idempotently', 'Rollback to any previous revision', 'A guarantee that every side effect executes exactly once', 'Autoscaling under vendor rate limits'],
+        answer: 0,
+        why: 'The claim bounds ownership: heartbeats distinguish a live worker from a dead one and a stale claim is retaken deliberately. A worker can still crash after a side effect but before marking the run done, and the retake replays it - so effects must be idempotent or transactionally coupled to the claim. The guard plus idempotent writes is the mechanism; neither half alone is enough.' },
       { q: 'The NWF signals stage is deterministic by key: runs are keyed on date plus engine version, and re-running converges instead of duplicating. Why include the engine version in the key?',
-        choices: ['It disables the ON CONFLICT path entirely', 'The version makes the primary key shorter', 'Older engines run faster with a higher key', 'A code change must produce a fresh run rather than silently updating yesterday outputs - reproducibility per version, convergence within a version'],
-        answer: 3,
+        choices: ['The version makes the primary key shorter', 'A code change must produce a fresh run rather than silently updating yesterday outputs - reproducibility per version, convergence within a version', 'It disables the ON CONFLICT path entirely', 'Older engines run faster with a higher key'],
+        answer: 1,
         why: 'Point-in-time correctness for pipelines: the same reason the backtest-bias rep forbids peeking. A backfill with a new engine is new data, and the key says so honestly.' },
     ],
     evidence: ['study notes', 'quotes-api/backend/feed_refresh.py'] },
@@ -700,9 +707,9 @@ export const NODES = [
     ],
     quiz: [
       { q: 'After a cache purge, every instance fetched the rate-limited vendor at once. Which three mitigations each break the chain, and which concept sizes the blast radius?',
-        choices: ['Bigger instance cap, more retries, longer timeouts', 'Smaller cache, no coalescing, fixed-interval retries', 'Daily purges, sequential fetches, no backoff', 'An in-memory LRU in front of Firestore, request coalescing, and backoff with jitter - Concurrency 80 times max instances sets how many requests can stampede'],
+        choices: ['Bigger instance cap, more retries, longer timeouts', 'Daily purges, sequential fetches, no backoff', 'Smaller cache, no coalescing, fixed-interval retries', 'An in-memory LRU in front of Firestore, request coalescing, and backoff with jitter - Concurrency 80 times max instances sets how many requests can stampede'],
         answer: 3,
-        why: 'The NWF client layer names the same defense in code: a rate-budget counter before vendor calls and a circuit breaker the API checks first. Slightly stale beats down - stale-while-revalidate is the next build.' },
+        why: 'The NWF estate has lived both defenses: a DynamoDB rate-budget counter once gated vendor calls before a cleanup PR removed it (say that as history, not current state), and a circuit breaker the API checks before calling out today. Slightly stale beats down - stale-while-revalidate is the next build.' },
     ],
     evidence: ['internal estate notes', 'quotes-api/backend/firestore.py'] },
 
@@ -987,8 +994,8 @@ export const NODES = [
     ],
     quiz: [
       { q: 'What chain turns permissions id-token write into cloud credentials with no stored keys, and where is the NWF estate building it?',
-        choices: ['The job mints a GitHub-signed OIDC token and the cloud exchanges it for short-lived credentials via WIF or AssumeRoleWithWebIdentity - the NWF Terraform slot is wiring this for its deploy service account', 'GitHub stores the cloud key in repo secrets - the NWF slot rotates it', 'The action marketplace provides tokens - the NWF slot pins actions', 'The runner SSHes to the cloud with a deploy key - the NWF slot uses key pairs'],
-        answer: 0,
+        choices: ['The runner SSHes to the cloud with a deploy key - the NWF slot uses key pairs', 'The job mints a GitHub-signed OIDC token and the cloud exchanges it for short-lived credentials via WIF or AssumeRoleWithWebIdentity - the NWF Terraform slot proposes this for its deploy service account', 'GitHub stores the cloud key in repo secrets - the NWF slot rotates it', 'The action marketplace provides tokens - the NWF slot pins actions'],
+        answer: 1,
         why: 'Same pattern, both clouds, one win: nothing static to leak. Around it: pin third-party actions to commit SHAs, and never run untrusted PR code with secrets - pull_request_target is the classic footgun.' },
     ],
     evidence: ['study notes'] },
