@@ -30,6 +30,8 @@ const LABEL_CHAR_WIDTH = 5.5;
 const LABEL_EXTRA_MAX = 30;
 
 const TYPE_GRID_PULL = 0.14;
+const TOPIC_CLUSTER_PULL = 0.1;
+const TOPIC_CLUSTER_MIN_NODES = 60;
 const RADIAL_PULL = 0.6;
 const RADIAL_INNER_RADIUS = 50;
 const RADIAL_OUTER_SHARE = 0.42;
@@ -94,21 +96,65 @@ function radialTargets(nodes, W, H) {
   return targets;
 }
 
+/** Gentle push back toward the world box once a node drifts outside it. Unlike a
+ * hard clamp this does not pin nodes onto the boundary line, so repulsion can
+ * still space boundary nodes along the edge instead of stacking them on it. */
+function containmentForce(world) {
+  let ns;
+  const margin = 16;
+  const force = alpha => {
+    for (const d of ns) {
+      if (d.fx != null) continue;
+      if (d.x < margin) d.vx += (margin - d.x) * 0.4 * alpha;
+      else if (d.x > world.w - margin) d.vx += (world.w - margin - d.x) * 0.4 * alpha;
+      if (d.y < margin) d.vy += (margin - d.y) * 0.4 * alpha;
+      else if (d.y > world.h - margin) d.vy += (world.h - margin - d.y) * 0.4 * alpha;
+    }
+  };
+  force.initialize = n => { ns = n; };
+  return force;
+}
+
 /** Build the simulation for a layer's graph. Presets add positional forces. */
 export function createSimulation(nodes, edges, { width, height, spread, preset, radiusOf, labelMinDegree }) {
+  // Big graphs get a bigger world: the charge needs room to spread before the
+  // viewport fit scales it back down, otherwise nodes pack against the bounds.
+  const worldScale = Math.max(1, Math.sqrt(nodes.length / 40));
+  const world = { w: width * worldScale, h: height * worldScale };
   const sim = d3.forceSimulation(nodes)
     .force('link', d3.forceLink(edges).id(d => d.id).distance(d => linkDistanceFor(d) * spread))
     .force('charge', d3.forceManyBody().strength(BASE.charge * spread))
     .force('collision', d3.forceCollide().radius(collideRadiusFor({ spread, radiusOf, labelMinDegree })))
-    .force('x', d3.forceX(width / 2).strength(BASE.centerPull))
-    .force('y', d3.forceY(height / 2).strength(BASE.centerPull));
+    .force('x', d3.forceX(world.w / 2).strength(BASE.centerPull))
+    .force('y', d3.forceY(world.h / 2).strength(BASE.centerPull))
+    .force('contain', containmentForce(world));
+  sim.world = world;
+
+  // Big topic-bearing layers (the Python fundamentals set) cluster by topic in
+  // free mode: without a positional pull the charge presses the whole graph
+  // against the world bounds, which reads as a rectangular ring on narrow
+  // screens. Untopicked anchor nodes drift to the middle.
+  const clusterTopics = preset === 'free' && nodes.length >= TOPIC_CLUSTER_MIN_NODES
+    ? [...new Set(nodes.map(n => n.topic).filter(Boolean))]
+    : [];
+  if (clusterTopics.length >= 4) {
+    const cols = Math.max(2, Math.round(Math.sqrt(clusterTopics.length * (world.w / world.h))));
+    const rows = Math.ceil(clusterTopics.length / cols);
+    const targets = new Map(clusterTopics.map((topic, i) => [topic, {
+      x: (world.w * ((i % cols) + 0.5)) / cols,
+      y: (world.h * (Math.floor(i / cols) + 0.5)) / rows,
+    }]));
+    const center = { x: world.w / 2, y: world.h / 2 };
+    sim.force('x', d3.forceX(d => targets.get(d.topic)?.x ?? center.x).strength(TOPIC_CLUSTER_PULL));
+    sim.force('y', d3.forceY(d => targets.get(d.topic)?.y ?? center.y).strength(TOPIC_CLUSTER_PULL));
+  }
 
   if (preset === 'type') {
-    const targets = typeGridTargets(nodes, width, height);
+    const targets = typeGridTargets(nodes, world.w, world.h);
     sim.force('x', d3.forceX(d => targets.get(d.type)?.x ?? width / 2).strength(TYPE_GRID_PULL));
     sim.force('y', d3.forceY(d => targets.get(d.type)?.y ?? height / 2).strength(TYPE_GRID_PULL));
   } else if (preset === 'radial') {
-    const targets = radialTargets(nodes, width, height);
+    const targets = radialTargets(nodes, world.w, world.h);
     sim.force('x', d3.forceX(d => targets.get(d.id)?.x ?? width / 2).strength(RADIAL_PULL));
     sim.force('y', d3.forceY(d => targets.get(d.id)?.y ?? height / 2).strength(RADIAL_PULL));
   }
