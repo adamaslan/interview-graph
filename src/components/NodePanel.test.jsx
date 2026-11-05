@@ -17,12 +17,11 @@ describe('NodePanel quiz rendering', () => {
     expect(html.match(/<button/g).length).toBeGreaterThanOrEqual(totalChoices);
   });
 
-  it('renders no Quick check section for nodes without quiz items', () => {
-    const plain = NODES.find(n => !(n.quiz?.length > 0));
-    const html = renderToStaticMarkup(
-      <NodePanel nodeId={plain.id} onSelect={() => {}} onClose={() => {}} />
-    );
-    expect(html).not.toContain('Quick check');
+  it('every node in the graph carries at least one quick check', () => {
+    // The quick checks are how the questions connect all the nodes: coverage is total.
+    for (const n of NODES) {
+      expect(n.quiz?.length, `${n.id} should have a quick check`).toBeGreaterThanOrEqual(1);
+    }
   });
 
   it('every quiz item is well formed', () => {
