@@ -681,6 +681,135 @@ export const NODES = [
       'The fluency link: this exercise is the Firestore node made physical - TTL, the 1 MiB cap, hot documents, archive-before-delete. When the talking points and the reps reinforce each other, two hours of expert talk is just walking the graph.',
     ],
     evidence: ['quotes-api/backend/price_store.py', 'quotes-api/backend/archiver.py'] },
+
+  { id: 'x-eval-harness', type: 'exercise', label: 'Rep: eval harness with CI gates (Protocols)',
+    summary: 'Live-coding rep on quotes-api backend/evals/harness.py: an EvalHarness dataclass that scores signal variants (hit rate, Sharpe, consistency, schema validity, cost, p95 latency) and gates deploys on regression thresholds. Variants are typed as a runtime_checkable Protocol.',
+    prompt: 'Add a new gating metric to the harness: max drawdown of the simulated equity curve. Thread it through PredictionRecord aggregation, EvalRunResult, and REGRESSION_THRESHOLDS, and decide its Tier (gating vs informational). Write the failing test first: a variant whose hit rate passes but whose drawdown trips the gate.',
+    files: ['quotes-api/backend/evals/harness.py', 'quotes-api/backend/evals/metrics.py'],
+    timeboxMin: 25,
+    skills: ['Protocol classes and runtime_checkable', 'dataclass evolution without breaking callers', 'threshold design', 'test-first under time pressure'],
+    twists: [
+      'runtime_checkable only verifies method presence, not signatures. Demonstrate a variant that satisfies isinstance() but blows up at call time, then say what you would do about it (static typing, not more runtime checks).',
+      'Bug seed: a threshold is written as a positive number when the comparison expects a negative delta - the gate never fires. Find it with a test, and say why sign conventions belong in the constant name.',
+      'An interviewer asks: why gate CI on evals at all instead of eyeballing? Answer with the free-model-failures incident shape: silent quality regressions look exactly like green dashboards.',
+    ],
+    talkingPoints: [
+      'This file is the AI-engineer interview answer in miniature: evals as deploy gates, not reports. The story is the tiering - Tier 1 gates block deploys, informational metrics just get logged - and being able to defend where the line sits.',
+    ],
+    evidence: ['quotes-api/backend/evals/harness.py', 'quotes-api/backend/evals/metrics.py'] },
+
+  { id: 'x-agent-loop', type: 'exercise', label: 'Rep: agent loop with hard budgets (asyncio)',
+    summary: 'Live-coding rep on quotes-api backend/agents/base.py: a ReAct-style agent loop with hard caps (max turns, max tool calls, wallclock seconds), a tool registry, and a two-level fallback to one-shot LLM call and then rule-based output.',
+    prompt: 'Extend AgentSession with a per-tool-call timeout and a cost budget in USD: each dispatched tool declares an estimated cost, the session accumulates it, and exceeding the budget flips budget_exceeded and forces the fallback path. Keep can_call_tool() as the single gate. Tests: timeout fires mid-tool, cost cap trips before turn cap, fallback produces a valid response shape.',
+    files: ['quotes-api/backend/agents/base.py'],
+    timeboxMin: 30,
+    skills: ['asyncio dispatch (sync vs coroutine functions)', 'budget enforcement as a single gate', 'fallback-chain design', 'registry patterns'],
+    twists: [
+      'Bug seed: the wallclock check moves after the tool dispatch instead of before - what is the worst case, and why does it only show up under a slow vendor?',
+      '_dispatch_tool branches on asyncio.iscoroutinefunction. What breaks if a tool is a functools.partial of an async function, and how do you make the registry robust?',
+      'The fallback chain is the interview story: agent loop to one-shot call to rule-based. Narrate why each level exists and what you log when you drop a level - silent degradation is the failure mode.',
+    ],
+    talkingPoints: [
+      'Agent reliability is the question every AI interview circles to. This file gives a concrete answer: hard budgets in one gate function, a fallback chain that degrades gracefully, and structured records of every tool call for postmortems.',
+    ],
+    evidence: ['quotes-api/backend/agents/base.py'] },
+
+  { id: 'x-vendor-client', type: 'exercise', label: 'Rep: rate-limited async API client',
+    summary: 'Debugging rep on quotes-api backend/vendor_client.py: an async wrapper for a market-data vendor free tier (5 calls/minute) using a module-level semaphore for single-flight spacing, exponential backoff retries, and one persistent httpx.AsyncClient.',
+    prompt: 'The vendor adds a second tier with a different rate limit per endpoint group. Refactor the single global semaphore-and-spacing scheme into a per-endpoint-group limiter without breaking callers. Then write tests that prove two groups can proceed concurrently while spacing inside a group is still enforced.',
+    files: ['quotes-api/backend/vendor_client.py'],
+    timeboxMin: 30,
+    skills: ['asyncio.Semaphore patterns', 'exponential backoff and jitter', 'module-level state and its test costs', 'connection pooling'],
+    twists: [
+      'Bug seed: the retry loop retries 4xx the same as 5xx. What does that do to a 12-second-spaced free tier, and which status codes deserve retries at all?',
+      'Module-level _LAST_CALL and a global client: how does this behave under test parallelism, and what is the smallest change that makes it injectable?',
+      'Tie it to the estate: this client is why the thundering-herd 429 incident did not repeat - spacing, backoff, and a warm cache working together. Walk that cause chain out loud.',
+    ],
+    talkingPoints: [
+      'Rate-limit clients are where async Python gets real: a semaphore for spacing, backoff for transients, one client for pooling. The senior answer includes what you deliberately did not build - no queue, no worker, because 5 calls a minute does not earn one.',
+    ],
+    evidence: ['quotes-api/backend/vendor_client.py'] },
+
+  { id: 'x-pytest-env', type: 'exercise', label: 'Rep: conftest env stubbing and test isolation',
+    summary: 'Live-coding rep on quotes-api backend/tests/conftest.py: the suite runs without cloud access because conftest stubs env vars at import time and puts backend/ on sys.path. 15-plus test modules build on that pattern.',
+    prompt: 'A new module reads its config from env at import time AND caches a client in a module global. Add it to the suite without breaking test isolation: stub the env in conftest, then write a fixture that resets the module global between tests. Explain why monkeypatch.setenv after import is too late.',
+    files: ['quotes-api/backend/tests/conftest.py', 'quotes-api/backend/tests/test_scheduler_auth.py'],
+    timeboxMin: 20,
+    skills: ['pytest fixtures and monkeypatch', 'import-time vs call-time config', 'test isolation', 'parametrization'],
+    twists: [
+      'Bug seed: conftest uses os.environ.setdefault and CI already defines one of the vars with a real value - what class of failure does that produce, and when is setdefault actually right?',
+      'Order matters: a test file imports the module before conftest runs. Explain the pytest import sequence and the two standard fixes.',
+      'Interviewer pivot: how does this connect to deploy safety? Answer: the same import-time env reads are why the September secret-binding audit mattered - config that binds at import or deploy is a diff you have to review.',
+    ],
+    talkingPoints: [
+      'Test-infra questions separate people who write tests from people who run them. Being able to explain conftest import order, monkeypatch timing, and why globals defeat isolation is a fast credibility win.',
+    ],
+    evidence: ['quotes-api/backend/tests/conftest.py'] },
+
+  { id: 'x-rsi-feature', type: 'exercise', label: 'Rep: Wilder RSI and divergence (pandas)',
+    summary: 'Live-coding rep on quotes-api backend/features_rsi.py: RSI(14) with Wilder smoothing via ewm, 3-bar swing detection, and rule-based bullish/bearish divergence classification, all in pandas/numpy with Literal-typed outputs.',
+    prompt: 'The swing detector uses a centered 3-bar window, which needs future bars. Quantify the lookahead: rewrite detection to use only trailing data, measure how many extra bars of lag that adds, and write a test that proves no output row depends on a later input row. That test is the interview centerpiece.',
+    files: ['quotes-api/backend/features_rsi.py'],
+    timeboxMin: 30,
+    skills: ['pandas ewm and rolling semantics', 'lookahead bias detection', 'NaN warm-up windows', 'Literal types as API contracts'],
+    twists: [
+      'Bug seed: avg_loss.replace(0, inf) before the division - what does RSI become when there are no losses, and is 100 the right answer? Defend the convention.',
+      'ewm(adjust=False) is Wilder smoothing; adjust=True is not. Show the difference on 30 rows of data and say why the default would silently change every signal.',
+      'The centered-window question is the trap of the rep: a feature that peeks 3 bars forward looks great in backtests and fails live. Connect it to the backtest-bias rep.',
+    ],
+    talkingPoints: [
+      'Numeric feature code is where correctness is silent: no exception, just wrong numbers. The habit to narrate is writing the no-lookahead test and the warm-up test before trusting any series.',
+    ],
+    evidence: ['quotes-api/backend/features_rsi.py'] },
+
+  { id: 'x-traceback-drill', type: 'exercise', label: 'Rep: traceback triage (debugging method)',
+    summary: 'Debugging-method rep built from the estate incident shapes: a Firestore DEADLINE_EXCEEDED under a 60-second scheduler header, a pydantic ValidationError from a vendor payload change, and an asyncio task cancelled mid-gather. Read, localize, narrate.',
+    prompt: 'For each of three tracebacks (pull a real one from Cloud Logging, redact, paste into a scratch file): say the failing frame out loud in one sentence, name the next command you would run, and state what evidence would falsify your first hypothesis. Finish by writing the regression test for one of them.',
+    files: ['quotes-api/backend/main.py', 'quotes-api/backend/firestore.py'],
+    timeboxMin: 25,
+    skills: ['reading tracebacks bottom-up', 'hypothesis-driven debugging', 'breakpoint()/pdb vs logging', 'writing the regression test'],
+    twists: [
+      'The deadline-mismatch incident is the model: 16 of 20 DEADLINE_EXCEEDED against a dashboard of 200s. Why did the success metric lie, and where in the traceback chain does the truth live?',
+      'asyncio.gather cancellation: one task raises, the rest are cancelled - where does the CancelledError surface, and what does return_exceptions=True change?',
+      'Narrate the tooling decision out loud: when is print dead to you, when does logging win, and when do you reach for breakpoint() in a container you cannot attach to?',
+    ],
+    talkingPoints: [
+      'Live debugging rounds reward method, not memory: read the bottom frame first, say a falsifiable hypothesis, name the cheapest check. Practicing that narration on your own incident history is the closest thing to interview reps.',
+    ],
+    evidence: ['project-wiki/incident notes', 'quotes-api/backend/main.py'] },
+
+  { id: 'x-gil-concurrency', type: 'exercise', label: 'Rep: the GIL and your CPU-bound story',
+    summary: 'Live-coding rep that makes the concurrency-80 talking point physical: benchmark a CPU-bound pricing calculation under threads, processes, and asyncio, and explain why only one of them helps on one vCPU.',
+    prompt: 'Write a 20-line CPU-bound function (e.g. per-symbol indicator math over a year of bars) and time it three ways: sequential, asyncio.gather with a semaphore, ThreadPoolExecutor, ProcessPoolExecutor. Report the numbers, then explain them: the GIL, when threads still win (I/O), and what this implies for the concurrency setting on a CPU-bound Cloud Run service.',
+    files: ['quotes-api/backend2/analysis.py'],
+    timeboxMin: 25,
+    skills: ['GIL mechanics', 'concurrent.futures', 'asyncio vs threads vs processes', 'connecting language semantics to infra settings'],
+    twists: [
+      'The punchline rep: asyncio.gather on pure CPU work is serialized by the GIL - prove it with timing, then name the one change that makes gather correct for mixed I/O and CPU work (run_in_executor).',
+      'Why is the analysis work a separate service in the estate? Because one CPU-bound request can starve the other 79 concurrency slots. Now you can show the mechanism, not just say it.',
+      'Interviewer follow-up: what about free-threaded Python (3.13t)? Have the honest answer ready: promising, not production-proven in your estate, and here is how you would benchmark it before adopting.',
+    ],
+    talkingPoints: [
+      'This rep fuses the two interview tracks: the language question (explain the GIL) and the infra question (why this concurrency setting). Running the benchmark once gives you dated numbers you can quote the same way as the audit numbers.',
+    ],
+    evidence: ['quotes-api/backend/archiver.py'] },
+
+  { id: 'x-backtest-bias', type: 'exercise', label: 'Rep: point-in-time correctness (backtests)',
+    summary: 'Design-and-code rep on quotes-api backend/tests/backtests/: prove a signal evaluation only uses data available at its as_of timestamp - no settled bars from the future, no revised vendor data, no survivorship in the symbol set.',
+    prompt: 'Write validate_point_in_time(records): given backtest prediction records with as_of dates and feature timestamps, fail loudly on any feature stamped after its as_of. Then the harder half: enumerate the three other bias channels (vendor revisions, delisted symbols, settle-time races with the 22:30 UTC line) and write a guard or a named accepted-risk for each.',
+    files: ['quotes-api/backend/tests/backtests/backtest_signals.py', 'quotes-api/backend/feed_tracker.py'],
+    timeboxMin: 30,
+    skills: ['lookahead and point-in-time bias', 'settle-time edge cases', 'guard design vs accepted risk', 'falsifiable validation'],
+    twists: [
+      'Tie back to expected_last_date: a bar requested before its 22:30 UTC settle is a lookahead channel - write the test that crosses the settle line and catches it.',
+      'Bug seed: the backtest reads the current symbol list for a 2024 evaluation. Name the bias, estimate its direction (up or down), and say what data you would need to fix it.',
+      'The interview framing: nobody trusts a backtest, and they are right. Your answer is the list of bias channels with a guard or a named risk on each - that list is the senior move.',
+    ],
+    talkingPoints: [
+      'This rep connects the calendar code, the vendor client, and the eval harness into one correctness story: timestamps are contracts, and a backtest is only as honest as its point-in-time guards.',
+    ],
+    evidence: ['quotes-api/backend/tests/backtests/backtest_signals.py'] },
+
 ];
 
 // Relationships. Kinds are the verbs of the estate: deploys-to, triggers,
@@ -798,4 +927,13 @@ export const EDGES = [
   { source: 'x-verdict-core', target: 'svc-ledger-api', kind: 'practices_on' },
   { source: 'x-scheduler-auth', target: 'c-oidc-vs-bearer', kind: 'practices_on' },
   { source: 'x-price-sharding', target: 'ds-firestore', kind: 'practices_on' },
+
+  { source: 'x-eval-harness', target: 'svc-analysis-api', kind: 'practices_on' },
+  { source: 'x-agent-loop', target: 'svc-mcp-engine', kind: 'practices_on' },
+  { source: 'x-vendor-client', target: 'i-thundering-herd-429', kind: 'practices_on' },
+  { source: 'x-pytest-env', target: 'svc-data-api', kind: 'practices_on' },
+  { source: 'x-rsi-feature', target: 'svc-analysis-api', kind: 'practices_on' },
+  { source: 'x-traceback-drill', target: 'i-deadline-mismatch', kind: 'practices_on' },
+  { source: 'x-gil-concurrency', target: 'c-concurrency', kind: 'practices_on' },
+  { source: 'x-backtest-bias', target: 'x-feed-freshness', kind: 'practices_on' },
 ];
