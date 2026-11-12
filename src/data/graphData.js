@@ -2,6 +2,7 @@
 // type metadata, layers, and edge-kind labels. Mirrors the original app's
 // graphData.js shape.
 import { NODES as BASE_NODES, EDGES as BASE_EDGES } from './baseData';
+import { SOLUTION_NODES, SOLUTION_EDGES, SOLUTION_IDS } from './solutionsData';
 
 /** Nine node types share six color families; shape tells types apart inside a family. */
 export const TYPE_COLORS = {
@@ -10,6 +11,7 @@ export const TYPE_COLORS = {
   datastore: 'var(--fam-infra)',
   scheduler: 'var(--fam-infra)',
   concept:   'var(--fam-depth)',
+  solution: 'var(--fam-depth)',
   incident:  'var(--fam-fire)',
   aws:       'var(--fam-cloud)',
   gha:       'var(--fam-ci)',
@@ -20,11 +22,11 @@ export const TYPE_COLORS = {
 export const TYPE_SHAPES = {
   service: 'circle', frontend: 'circle', scheduler: 'circle',
   datastore: 'square', aws: 'square', gha: 'square',
-  concept: 'diamond', incident: 'diamond', exercise: 'diamond',
+  solution: 'diamond', concept: 'diamond', incident: 'diamond', exercise: 'diamond',
 };
 
 export const TYPE_LABELS = {
-  service: 'Service', frontend: 'Frontend', datastore: 'Datastore',
+  solution: 'Solutions study', service: 'Service', frontend: 'Frontend', datastore: 'Datastore',
   scheduler: 'Scheduler', concept: 'Concept', incident: 'Incident',
   aws: 'AWS equivalent', gha: 'GHA pattern', exercise: 'Practice rep',
 };
@@ -34,6 +36,7 @@ export const tint = (color, percent) => `color-mix(in srgb, ${color} ${percent}%
 
 /** Filter-bar layers: which node types each view shows. A 72-node graph is not a good default. */
 export const LAYERS = [
+  { id: 'solutions', label: '66degrees', types: ['solution', 'service', 'concept', 'incident', 'gha'], nodeIds: SOLUTION_IDS },
   { id: 'estate',    label: 'Estate',    types: ['service', 'frontend', 'datastore', 'scheduler'] },
   { id: 'depth',     label: 'Depth',     types: ['concept', 'service', 'scheduler', 'datastore'] },
   { id: 'incidents', label: 'Incidents', types: ['incident', 'service', 'scheduler', 'datastore', 'frontend', 'concept'] },
@@ -52,8 +55,8 @@ export const EDGE_KINDS = {
   relates_to: 'relates to', practices_on: 'practices on',
 };
 
-export const NODES = BASE_NODES;
-export const EDGES = BASE_EDGES;
+export const NODES = [...BASE_NODES, ...SOLUTION_NODES];
+export const EDGES = [...BASE_EDGES, ...SOLUTION_EDGES];
 
 const nodeById = new Map(NODES.map(n => [n.id, n]));
 export const nodeBy = id => nodeById.get(id);
@@ -78,7 +81,7 @@ export function edgesFor(id) {
 export function layerGraph(layerId) {
   const layer = LAYERS.find(l => l.id === layerId) ?? LAYERS[0];
   const types = new Set(layer.types);
-  const nodes = NODES.filter(n => types.has(n.type));
+  const nodes = NODES.filter(n => types.has(n.type) && (!layer.nodeIds || layer.nodeIds.includes(n.id)));
   const visible = new Set(nodes.map(n => n.id));
   const edges = EDGES.filter(e => visible.has(e.source) && visible.has(e.target));
   return { nodes, edges };
