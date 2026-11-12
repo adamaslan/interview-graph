@@ -3,8 +3,8 @@ import { SOLUTION_NODES, SOLUTION_EDGES, SOLUTION_IDS, SOLUTION_CONVERSATION_IDS
 import { layerGraph, nodeBy, edgesFor } from './graphData';
 import { NODES as BASE_NODES } from './baseData';
 describe('66degrees public study bridge', () => {
-  it('has fourteen sourced study nodes and eight existing technical anchors', () => {
-    expect(SOLUTION_NODES).toHaveLength(14);
+  it('has eighteen sourced study nodes and eight existing technical anchors', () => {
+    expect(SOLUTION_NODES).toHaveLength(18);
     const anchors = SOLUTION_IDS.filter(id => !id.startsWith('s-'));
     expect(anchors).toHaveLength(8);
     for (const id of anchors) expect(BASE_NODES.some(n => n.id === id)).toBe(true);
@@ -31,9 +31,21 @@ describe('66degrees public study bridge', () => {
   it('uses the same curated membership for graph and list, without unrelated nodes', () => {
     const { nodes, edges } = layerGraph('solutions');
     expect(nodes.map(n => n.id).sort()).toEqual([...SOLUTION_IDS].sort());
-    expect(nodes).toHaveLength(22);
+    expect(nodes).toHaveLength(26);
     for (const e of SOLUTION_EDGES) expect(edges).toContainEqual(e);
     expect(nodes.some(n => n.id === 'fe-main-site')).toBe(false);
+  });
+  it('adds a discovery-to-production path that stays honest about evidence', () => {
+    for (const id of ['s-pipeline', 's-gate-first', 's-feedback', 's-explain']) {
+      expect(nodeBy(id).type).toBe('solution');
+      expect(nodeBy(id).quiz[0].choices).toHaveLength(4);
+    }
+    expect(nodeBy('s-pipeline').talkingPoints.join(' ')).toContain('self-directed projects');
+    expect(nodeBy('s-gate-first').talkingPoints.join(' ')).toContain('Do not present it as advice');
+    expect(nodeBy('s-feedback').talkingPoints.join(' ')).toContain('do not show the measurements improved a business outcome');
+    for (const id of ['s-pipeline', 's-gate-first', 's-feedback', 's-explain']) {
+      expect(nodeBy(id).sources[0].url).toBe('https://tastytechbytes.com/');
+    }
   });
   it('has no dangling bridge edge and keeps the company work hypothetical', () => {
     for (const e of SOLUTION_EDGES) { expect(nodeBy(e.source)).toBeTruthy(); expect(nodeBy(e.target)).toBeTruthy(); }
