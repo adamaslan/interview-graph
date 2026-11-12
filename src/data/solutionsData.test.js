@@ -43,6 +43,9 @@ describe('66degrees public study bridge', () => {
     expect(nodeBy('s-pipeline').talkingPoints.join(' ')).toContain('self-directed projects');
     expect(nodeBy('s-gate-first').talkingPoints.join(' ')).toContain('Do not present it as advice');
     expect(nodeBy('s-feedback').talkingPoints.join(' ')).toContain('do not show the measurements improved a business outcome');
+    for (const id of ['s-pipeline', 's-gate-first', 's-feedback', 's-explain']) {
+      expect(nodeBy(id).sources[0].url).toBe('https://tastytechbytes.com/');
+    }
   });
   it('has no dangling bridge edge and keeps the company work hypothetical', () => {
     for (const e of SOLUTION_EDGES) { expect(nodeBy(e.source)).toBeTruthy(); expect(nodeBy(e.target)).toBeTruthy(); }

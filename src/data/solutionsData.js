@@ -1,6 +1,7 @@
 // Public study material only. No interview logistics, contacts or private application data.
 const company = 'https://66degrees.com/';
 const source = [{ label: '66degrees company site', url: company }];
+const blogSource = [{ label: 'TastyTechBytes, the builder\'s technical blog', url: 'https://tastytechbytes.com/' }];
 function node(id, label, summary, talkingPoints, q, choices, why, sources = source) {
   return { id, type: 'solution', label, summary, talkingPoints, sources,
     quiz: [{ q, choices, answer: 0, why }] };
@@ -130,7 +131,7 @@ export const SOLUTION_NODES = [
       'Keep the claim ladder honest: built, tested, deployed, used, and measured are five different statements. Say the highest rung you can defend and name the next one.',
     ], 'Which statement about a delivered tool is the strongest evidence of value?',
     ['People kept using it for the real task and the agreed measure moved against a baseline', 'The demo ran without errors', 'The pull request merged', 'The model scored well on a public benchmark'],
-    'Each rung of built, tested, deployed, used and measured is a separate claim; value sits at the top rungs.'),
+    'Each rung of built, tested, deployed, used and measured is a separate claim; value sits at the top rungs.', blogSource),
   node('s-gate-first', 'Cheap gate before the costly step',
     'Practice explaining a design decision that controls cost and noise: run inexpensive deterministic checks first, reject most candidates, and only then spend a language model on the survivors. Based on the builder\'s own public signals project; its figures are from an August overview and illustrative here.', [
       'Mechanism: a scheduled scan reads a universe of roughly a thousand tickers, runs about eighteen independent detectors, scores their agreement and applies a publication gate. Only what passes the gate is sent to a model for a written summary. The ordering is the design: cost, module boundaries and workflow layout all follow from putting the gate before synthesis.',
@@ -149,7 +150,7 @@ export const SOLUTION_NODES = [
       'Boundary: calibration scripts and a self-grading harness show how to measure; they do not show the measurements improved a business outcome. Say which one you are describing.',
     ], 'A job rewrites its own configuration when a model is retired. What keeps this safe?',
     ['It opens a pull request only on change so a person reviews it, with an owner and a rollback route', 'It deploys silently so nobody is interrupted', 'It trusts a passing unit test as proof the provider recovered', 'It removes the fallback chain'],
-    'Automation can propose; a reviewer decides, and live-state proof is separate from a source-level test.'),
+    'Automation can propose; a reviewer decides, and live-state proof is separate from a source-level test.', blogSource),
   node('s-explain', 'Make complex engineering understandable',
     'Practice the translation skill the role asks for: explain a technical system so a non-engineer can decide something. Illustrated by a technical blog written in a fixed, plain structure, and by writing a design narrative for mixed audiences.', [
       'Structure that works for mixed audiences: lead with what changed and why it matters, show one picture of the flow, give a short list of takeaways, then put methodology, limits and sources at the end. The builder\'s blog follows a house structure with a diagram first, a summary, takeaways, detail and attribution, so a reader can stop at any depth and still have the right idea.',
