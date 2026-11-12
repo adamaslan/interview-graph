@@ -6,23 +6,31 @@ function node(id, label, summary, talkingPoints, q, choices, why, sources = sour
     quiz: [{ q, choices, answer: 0, why }] };
 }
 export const SOLUTION_NODES = [
-  node('s-66degrees', '66degrees: internal workflow practice',
-    'A study path for internal AI delivery: understand the work, earn trust, choose a useful intervention, ship it and measure whether people keep using it. All scenarios are hypothetical practice, not claims of work performed for 66degrees or a public job-description reproduction.', [
-      'Start with the workflow: who does the work, where it stalls, what an error costs and who can approve a change. Then choose the smallest useful technical slice.',
-      'Treat a colleague as a partner, not a ticket queue. Ask about their incentives, anxiety, workarounds and decision rights before suggesting a tool. Practice listening and a respectful no-build recommendation.',
-      'Practice the route from discovery through a reusable service, access control, evaluation, release and adoption. Explain one trade-off and one piece of evidence at each connection. Do not quote illustrative estate numbers as current outcomes.',
+  node('s-66degrees', '66degrees: start with the stakeholder',
+    'Practice internal tooling for a Google Cloud and AI consulting business: help non-engineers prepare accurate briefs, find approved knowledge, review proposed work and learn a new workflow. Walk through discovery, trust, trade-offs and observed outcomes; use technical detail to explain how a chosen solution could work. All scenarios are hypothetical practice, not claims of work performed for 66degrees or a public job-description reproduction.', [
+      'Proposed exercise for 66degrees, not a report of its systems: a solution consultant needs an accurate first brief; a business-development colleague needs approved answers; an operations reviewer needs ownership and approval to be clear. Confirm the need with each person before building.',
+      'Non-engineers need a usable starting point, trusted sources, visible unknowns, plain-language controls and a person to contact when the tool is wrong. Ask what would let them use the result in their normal work, not whether they like an AI demo.',
+      'Practice this route: discovery -> trust -> a smaller or different choice -> adoption -> evidence of value. Separate what was requested, what was learned, what was delivered and what actually changed. Open the technical connections when someone asks how.',
       'Study beforehand and practice unaided. This graph is a learning aid, not a live interview answer service or a prediction of exact interview questions.',
     ], 'Which is the best opening for a solutions discussion?',
     ['Map the workflow, owner, baseline and failure cost before proposing an agent', 'Lead with the largest available model', 'Assume every workflow needs an agent', 'Treat a demo as evidence of production adoption'],
     'The company emphasizes workflow outcomes, production delivery and adoption. The implementation should follow the problem.'),
-  node('s-discovery', 'Discovery: problem to acceptance test',
-    'Practice a concrete hypothetical: approved account-discovery notes become a human-reviewed solution brief. This is a design exercise, not a reported 66degrees project or an autonomous customer-send tool.', [
-      'For this fictional internal exercise, ask the person preparing the brief and the person reviewing it to walk through notes, requirements, unanswered questions and approval. Identify the data owner and the final reviewer.',
+  node('s-discovery', 'Discovery: what is the person trying to do?',
+    'Proposed internal brief assistant: a solution consultant asks for faster brief preparation from approved discovery notes and reusable material. Before designing anything, understand the last time they did the work, who reviewed it and what made it difficult. The user needs editable drafts, source links, missing-information prompts and a clear final reviewer. This is an exercise, not a reported company project.', [
+      'Ask: "Can you walk me through the last brief, including the workarounds? What takes effort, what gets sent back, and who depends on it?" Reflect the problem back and check that both the preparer and reviewer agree.',
       'Measure current turnaround, reviewer rework and unsupported claims before setting a target. Practice cycle time, accepted drafts, hours saved after review effort, and output consistency; a win-rate change needs an attribution caveat. A target agreed with a stakeholder is different from a number invented for a pitch.',
       'Define acceptance: the brief links each claim to an approved source, marks unknowns and cannot send a quote or promise to a customer. A simple form plus rules may beat an agent for the first slice.',
     ], 'What makes a discovery metric defensible?',
     ['A measured baseline and a stakeholder-agreed success threshold', 'An impressive percentage selected before observing the workflow', 'Tokens generated per minute alone', 'The number of tools attached to the agent'],
     'Workflow impact needs a baseline, an owner and an agreed definition of success.'),
+  node('s-trust', 'Trust: listen, disagree and set expectations',
+    'Proposed internal request-triage tool: an operations colleague needs clear scope, ownership and approval before a request becomes a delivery commitment. Practice the conversation when a sponsor wants full automation but a reviewer carries the risk. This is a fictional scenario, not a claim about any person or company.', [
+      'Ask each person what success means and what they are worried about. Reflect the concern in plain language before offering a solution; do not label hesitation as resistance.',
+      'Explain the trade-off in terms of their goal: what a smaller pilot can prove, what remains manual, and what would justify the next step. Check who can decide and who needs to be consulted.',
+      'Make a modest commitment with a clear boundary, owner and feedback point. If expectations or risk change, say so early. Candor and follow-through matter more than an impressive demo.',
+    ], 'A colleague is worried an AI tool will create more review work. What comes first?',
+    ['Understand the concern and agree how to test total effort and quality', 'Dismiss it because the demo is fast', 'Promise that all work will disappear', 'Add more tools before listening'],
+    'Trust starts by understanding the cost the other person may bear and testing the assumption together.'),
   node('s-core', 'Reusable delivery: one core, thin adapters',
     'Connect full-stack FDE delivery to the graph\'s generic ledger-api and data-api. The transferable pattern is a testable core behind HTTP, CLI or tool adapters, not a claim those services exist at 66degrees.', [
       'Draw intake UI -> typed API -> core workflow -> data/source adapter -> review screen. Keep business rules outside the transport layer so another delivery can reuse them.',
@@ -55,18 +63,18 @@ export const SOLUTION_NODES = [
     ], 'A merged fix is not visible to users. Which connection explains it?',
     ['The deploy gap: verify the deployed revision and real user journey', 'Python list mutability', 'A guarantee that CI always deploys', 'A reason to skip rollback planning'],
     'Source integration and live delivery need separate evidence.'),
-  node('s-adoption', 'Adoption: confidence, habits and feedback',
-    'Connect incident learning and reviewed automation to production adoption. The company emphasizes workflow transformation, adoption and governed production; use these themes to discuss outcomes, not only prototypes shipped.', [
+  node('s-adoption', 'Adoption: does it fit how people work?',
+    'Proposed approved-knowledge assistant: business-development and delivery colleagues need current, source-backed answers and reusable examples without mixing confidential accounts. Give them visible freshness, an easy correction path and training in when not to trust the answer. This is a hypothesis to validate, not a known company system.', [
       'Agree who uses the result, who operates the service and who receives an incident. Co-design a small pilot, explain what changes and what stays under human control, provide role-based practice and a clear manual path when automation fails. Listen privately to job-security concerns instead of dismissing them.',
       'Track accepted outputs, repeated edits and abandonment reasons with appropriate consent and data limits. Measure repeat use and task completion, not logins alone. Interview non-users without blame and change the workflow or training. Compare against the baseline before claiming ROI.',
-      'Turn a recurring fix into a tested reusable playbook or reviewable bot PR. Keep the human approval boundary where the action affects a client, money or access.',
+      'Ask what happened after delivery: did people return, complete the task and trust the output? If not, find out whether the process, quality or training needs to change before adding features. Technical incident and automation patterns are supporting examples below.',
     ], 'Which evidence best supports an adoption claim?',
     ['Observed use and accepted outcomes compared with the agreed baseline', 'A demo that compiled once', 'An agent with many tools', 'A claim that every user will save time'],
     'Adoption is observed workflow change, not code delivery alone.'),
-  node('s-judgment', 'Judgment: prioritize and say no',
-    'Practice choosing between a rule, a search tool, an agent and no build at all. The exercise starts with an internal bottleneck and a constrained delivery budget, not a preferred framework.', [
-      'Map the current workflow into inputs, decisions, handoffs and exceptions. Separate deterministic steps from ambiguous ones; fix a broken process before automating it.',
-      'Compare candidates by expected impact, evidence quality, effort, permissions, risk and stakeholder readiness. Write a small scope with non-goals and a named decision owner.',
+  node('s-judgment', 'Trade-offs: agree the smallest useful change',
+    'Compare three proposed internal-tool pilots for a consulting business: reviewed brief drafting, approved-knowledge lookup and request triage. Ask which has an engaged owner, permissioned inputs and an observable benefit. None is asserted to be an existing company need or system.', [
+      'For each proposed pilot, ask a non-engineer to show the last real task. Identify the handoff that loses context: collecting inputs, finding a source, getting review or learning the process. A shared template or clearer ownership may solve it without an agent.',
+      'Agree a small scope: one user group, one kind of brief or answer, approved sources and a human reviewer. Keep pricing, external promises and permission changes out of the pilot. Compare impact, review burden, risk and readiness before picking a tool.',
       'Role-play an anxious sponsor asking for full automation: reflect their concern, explain the consequence plainly, offer a reversible pilot and document the decision. Escalate scope or resource risk early.',
     ], 'A clear rule fixes the bottleneck. What should you recommend?',
     ['Use the rule, measure the result and leave agents out unless they add value', 'Add multiple agents to prove technical depth', 'Promise savings before measuring', 'Keep the sponsor unaware of delivery risk'],
@@ -105,14 +113,14 @@ export const SOLUTION_NODES = [
     ], 'What makes a reusable component useful beyond its first team?',
     ['Tests, examples, documented boundaries and a clear operating owner', 'Only a clever abstraction', "Hidden assumptions about one team's permissions", 'A promise that no maintenance is needed'],
     'Reuse succeeds when another team can understand, adapt and operate the pattern safely.'),
-  node('s-questions', 'Solutions conversation: questions and stories',
-    'Practice an internal-partner conversation, not a script for a particular person or a prediction of interview questions. Connect defensible delivery stories to judgment, relationships and measurable value.', [
-      'Ask: which internal workflow has an engaged owner, a measurable pain point and a safe first pilot? What would useful progress look like in the first 90 days?',
-      'Ask: what makes a pilot ready for production, who signs off and who operates it? How do field feedback and eval failures change the roadmap?',
-      'Practice three honest stories: ambiguous problem -> scoped build; disagreement -> listening -> shared decision; and failure -> diagnosis -> repair -> verified result. State personal contribution, evidence, trade-off and what remains unverified.',
+  node('s-questions', 'Outcomes: tell the story without overclaiming',
+    'Practice a short story about a real person, a useful choice and an observed result. Prompts are scaffolding to fill from actual experience, not achievements attributed to the reader or predictions of interview questions.', [
+      'Fill one real example: who needed what -> what question changed your understanding -> what you chose or declined -> what you personally did -> what happened afterward. If no example is available, describe a hypothetical approach explicitly.',
+      'Describe the result in the terms the stakeholder uses: less rework, a completed task, a clearer decision or a shorter cycle. Use only observed evidence. A prototype, a passing test and a deployed feature are not proof of adoption or savings.',
+      'For a limitation, name a narrow true gap, the relevant experience you do have and a practical next step. Say when you would ask for specialist help. Do not invent a weakness, a disagreement or a business metric to fill a story template.',
       'Ask about qualifications and expectations for the exact requisition. Never imply a certification, experience requirement or personal credential that has not been confirmed.',
-    ], 'How should a portfolio story handle an unverified production result?',
-    ['Separate what was built/tested from what was actually observed live', 'Present all successful tests as customer adoption', 'Quote illustrative numbers as measured results', 'Avoid mentioning limitations'],
+    ], 'A pilot shipped, but repeat use was not measured. What can you claim?',
+    ['Explain what shipped and say adoption remains unmeasured', 'Present all successful tests as customer adoption', 'Quote illustrative numbers as measured results', 'Avoid mentioning limitations'],
     'A solutions engineer earns trust by keeping implementation, testing, deployment and outcome evidence distinct.'),
 ];
 export const SOLUTION_EDGES = [
@@ -125,9 +133,14 @@ export const SOLUTION_EDGES = [
   ['s-agents', 's-core'], ['s-agents', 's-governance'], ['s-agents', 's-operations'],
   ['s-operations', 's-evals'], ['s-operations', 's-rollout'], ['s-operations', 's-adoption'],
   ['s-mentoring', 's-core'], ['s-mentoring', 's-adoption'],
+  ['s-66degrees', 's-trust'], ['s-discovery', 's-trust'], ['s-trust', 's-judgment'],
+  ['s-trust', 's-adoption'], ['s-judgment', 's-questions'], ['s-adoption', 's-questions'],
   ['s-discovery', 'svc-ledger-api'], ['s-core', 'svc-ledger-api'], ['s-core', 'svc-data-api'],
   ['s-governance', 'c-oidc-vs-bearer'], ['s-evals', 'i-free-model-failures'],
   ['s-rollout', 'c-idempotency'], ['s-rollout', 'c-revisions'], ['s-rollout', 'c-deploy-gap'],
   ['s-adoption', 'i-free-model-failures'], ['s-adoption', 'gha-bot-prs'], ['s-questions', 's-discovery'],
 ].map(([source, target]) => ({ source, target, kind: 'relates_to' }));
 export const SOLUTION_IDS = [...new Set([...SOLUTION_NODES.map(n => n.id), ...SOLUTION_EDGES.flatMap(e => [e.source, e.target])])];
+
+// Public conversation route first; engineering patterns remain optional depth.
+export const SOLUTION_CONVERSATION_IDS = ['s-66degrees', 's-discovery', 's-trust', 's-judgment', 's-adoption', 's-questions'];
