@@ -149,8 +149,8 @@ export default function NodePanel({ nodeId, onSelect, onClose }) {
       )}
 
       {node.sources?.length > 0 && (
-        <section><h3 className="text-sm font-semibold">Company source and study scope</h3>
-          <p className="text-xs">Company page checked Nov 11, 2026. The linked study advice is not a verified current job description, exact requisition match or company endorsement.</p>
+        <section><h3 className="text-sm font-semibold">Public references and study scope</h3>
+          <p className="text-xs">Original practice exercises with public background references. Not a reproduced job description, exact requisition claim or company endorsement. Technical examples do not imply a company uses that stack.</p>
           <ul>{node.sources.map(s => <li key={s.url}><a className="underline text-sm" href={s.url} target="_blank" rel="noreferrer">{s.label}</a></li>)}</ul>
         </section>
       )}
