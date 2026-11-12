@@ -148,6 +148,12 @@ export default function NodePanel({ nodeId, onSelect, onClose }) {
         </section>
       )}
 
+      {node.sources?.length > 0 && (
+        <section><h3 className="text-sm font-semibold">Public role sources</h3>
+          <p className="text-xs">Checked Nov 11, 2026. Public posting, not a confirmed requisition match or company endorsement.</p>
+          <ul>{node.sources.map(s => <li key={s.url}><a className="underline text-sm" href={s.url} target="_blank" rel="noreferrer">{s.label}</a></li>)}</ul>
+        </section>
+      )}
       {node.evidence?.length > 0 && (
         <section>
           <h3 className="text-sm font-semibold">Evidence</h3>
