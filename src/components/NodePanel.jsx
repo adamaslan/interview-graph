@@ -1,3 +1,4 @@
+import { SOLUTION_CONVERSATION_IDS } from '../data/solutionsData';
 import React from 'react';
 import { useEffect, useMemo, useState } from 'react';
 import { EDGE_KINDS, TYPE_LABELS, edgesFor, nodeBy } from '../data/graphData';
@@ -53,7 +54,11 @@ export default function NodePanel({ nodeId, onSelect, onClose }) {
     return () => clearTimeout(t);
   }, [secondsLeft]);
 
-  const edges = useMemo(() => (node ? edgesFor(node.id) : []), [node]);
+  const edges = useMemo(() => (node ? edgesFor(node.id).sort((a, b) => {
+    if (node.type !== 'solution') return 0;
+    const rank = id => { const i = SOLUTION_CONVERSATION_IDS.indexOf(id); return i < 0 ? 99 : i; };
+    return rank(a.other) - rank(b.other);
+  }) : []), [node]);
 
   if (!node) return null;
   const isExercise = node.type === 'exercise';
@@ -164,7 +169,7 @@ export default function NodePanel({ nodeId, onSelect, onClose }) {
       )}
 
       <section>
-        <h3 className="text-sm font-semibold">Connections</h3>
+        <h3 className="text-sm font-semibold">{node.type === 'solution' ? 'Continue the conversation, then go deeper' : 'Connections'}</h3>
         <div className="mt-1 flex flex-wrap gap-1">
           {edges.map((e, i) => {
             const other = nodeBy(e.other);
