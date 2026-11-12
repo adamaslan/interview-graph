@@ -35,7 +35,7 @@ const RADIAL_INNER_RADIUS = 50;
 const RADIAL_OUTER_SHARE = 0.42;
 const RING_ORDER = [
   'service', 'frontend', 'datastore', 'scheduler',
-  'concept', 'incident', 'aws', 'gha', 'exercise',
+  'solution', 'concept', 'incident', 'aws', 'gha', 'exercise',
 ];
 
 const endId = (d, end) => (typeof d[end] === 'object' ? d[end].id : d[end]);
