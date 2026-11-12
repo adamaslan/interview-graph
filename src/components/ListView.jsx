@@ -1,18 +1,18 @@
 import React from "react";
 import { useMemo, useState } from 'react';
 import { SOLUTION_CONVERSATION_IDS } from '../data/solutionsData';
-import { NODES, DEGREE, TYPE_LABELS, TOPIC_LABELS } from '../data/graphData';
+import { NODES, DEGREE, TYPE_LABELS, TOPIC_LABELS, layerGraph } from '../data/graphData';
 
 /** Searchable list of every node - the keyboard-first path into the graph. */
-export default function ListView({ nodeIds, layerTypes, topic = 'all', onSelect, selectedId }) {
+export default function ListView({ layer = 'all', topic = 'all', onSelect, selectedId }) {
   const [query, setQuery] = useState('');
 
-  const stakeholderLayer = nodeIds?.includes('s-66degrees');
+  const stakeholderLayer = layer === 'solutions';
   const rows = useMemo(() => {
     const q = query.trim().toLowerCase();
+    const visible = new Set(layerGraph(layer, topic).nodes.map(n => n.id));
     return NODES
-      .filter(n => layerTypes.has(n.type) && (!nodeIds || nodeIds.includes(n.id)))
-      .filter(n => topic === 'all' || n.type !== 'python' || n.topic === topic)
+      .filter(n => visible.has(n.id))
       .filter(n => !q
         || n.label.toLowerCase().includes(q)
         || n.summary.toLowerCase().includes(q)
@@ -25,7 +25,7 @@ export default function ListView({ nodeIds, layerTypes, topic = 'all', onSelect,
         }
         return (DEGREE.get(b.id) ?? 0) - (DEGREE.get(a.id) ?? 0);
       });
-  }, [query, layerTypes, nodeIds, stakeholderLayer, topic]);
+  }, [query, layer, stakeholderLayer, topic]);
 
   return (
     <div className="panel-scroll h-full overflow-y-auto p-4">

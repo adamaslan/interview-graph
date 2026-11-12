@@ -28,6 +28,9 @@ export default function GraphView({ layer, topic = 'all', preset, spread, select
 
   const { nodes, edges } = useMemo(() => layerGraph(layer, topic), [layer, topic]);
   const walkSet = useMemo(() => new Set(walkIds ?? []), [walkIds]);
+  const walkKey = (walkIds ?? []).join('|');
+  const walkRef = useRef(walkSet);
+  walkRef.current = walkSet;
 
   // Track container size.
   useEffect(() => {
@@ -43,6 +46,7 @@ export default function GraphView({ layer, topic = 'all', preset, spread, select
 
   // (Re)build the simulation when the layer, topic-filtered graph, preset or size changes.
   useEffect(() => {
+    fitRef.current = null;
     const pins = loadPins(layer, preset);
     const prev = new Map(nodesRef.current.map(n => [n.id, n]));
     const simNodes = nodes.map(n => {
@@ -82,7 +86,7 @@ export default function GraphView({ layer, topic = 'all', preset, spread, select
         fitRef.current = (onlyIfNeeded = false) => {
           // Labels show for hubs plus the selected node and its neighbors - all
           // of those count toward the fit bounds so nothing renders off-canvas.
-          const labelled = new Set();
+          const labelled = new Set(walkRef.current);
           for (const d of simNodes) {
             if ((DEGREE.get(d.id) ?? 0) >= labelMinDegree) labelled.add(d.id);
           }
@@ -96,29 +100,35 @@ export default function GraphView({ layer, topic = 'all', preset, spread, select
               if (b === sel) labelled.add(a);
             }
           }
-          let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
-          for (const d of simNodes) {
-            const labelW = labelled.has(d.id) ? d.label.length * 6 : 0;
-            const r = radiusOf(d);
-            // Mirror the render-time flip: a label that would overflow the world
-            // edge flips to the node's left.
-            const flip = d.x + r + 5 + labelW > world.w - 2;
-            x0 = Math.min(x0, d.x - r - (flip && labelW ? labelW + 5 : 0));
-            x1 = Math.max(x1, d.x + r + (flip ? 0 : labelW));
-            y0 = Math.min(y0, d.y - r); y1 = Math.max(y1, d.y + r);
-          }
+          const boundsFor = candidates => {
+            let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+            for (const d of candidates) {
+              const labelW = labelled.has(d.id) ? d.label.length * 6 : 0;
+              const r = radiusOf(d);
+              // Mirror the render-time flip: a label that would overflow the world
+              // edge flips to the node's left.
+              const flip = d.x + r + 5 + labelW > world.w - 2;
+              x0 = Math.min(x0, d.x - r - (flip && labelW ? labelW + 5 : 0));
+              x1 = Math.max(x1, d.x + r + (flip ? 0 : labelW));
+              y0 = Math.min(y0, d.y - r); y1 = Math.max(y1, d.y + r);
+            }
+            return { x0, y0, x1, y1 };
+          };
+          const { x0, y0, x1, y1 } = boundsFor(simNodes);
           const pad = 30;
           const bw = Math.max(1, x1 - x0 + 2 * pad);
           const bh = Math.max(1, y1 - y0 + 2 * pad);
-          const k = Math.min(1, size.width / bw, size.height / bh);
+          const k = Math.max(0.1, Math.min(1, size.width / bw, size.height / bh));
           const tx = (size.width - k * (x0 + x1)) / 2;
           const ty = (size.height - k * (y0 + y1)) / 2;
           if (onlyIfNeeded) {
             // Refit only when a labelled node currently sits outside the view;
             // leave the user's own pan/zoom alone otherwise.
             const t = d3.zoomTransform(svgRef.current);
-            const sx0 = t.applyX(x0) - pad, sx1 = t.applyX(x1) + pad;
-            const sy0 = t.applyY(y0) - pad, sy1 = t.applyY(y1) + pad;
+            const labelledBounds = boundsFor(simNodes.filter(d => labelled.has(d.id)));
+            if (!Number.isFinite(labelledBounds.x0)) return;
+            const sx0 = t.applyX(labelledBounds.x0) - pad, sx1 = t.applyX(labelledBounds.x1) + pad;
+            const sy0 = t.applyY(labelledBounds.y0) - pad, sy1 = t.applyY(labelledBounds.y1) + pad;
             if (sx0 >= 0 && sy0 >= 0 && sx1 <= size.width && sy1 <= size.height) return;
           }
           d3.select(svgRef.current).call(
@@ -131,14 +141,14 @@ export default function GraphView({ layer, topic = 'all', preset, spread, select
 
     const svg = d3.select(svgRef.current);
     const zoom = d3.zoom()
-      .scaleExtent([0.3, 4])
+      .scaleExtent([0.1, 4])
       .on('zoom', event => {
         svg.select('g.viewport').attr('transform', event.transform);
       });
     zoomRef.current = zoom;
     svg.call(zoom);
 
-    return () => { sim.stop(); svg.on('.zoom', null); };
+    return () => { sim.stop(); fitRef.current = null; svg.on('.zoom', null); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [layer, preset, size.width, size.height, nodes, edges]);
 
@@ -147,6 +157,7 @@ export default function GraphView({ layer, topic = 'all', preset, spread, select
     const sim = simRef.current;
     if (!sim) return;
     applySpacing(sim, { spread, radiusOf, labelMinDegree });
+    sim.on('end.refit', () => fitRef.current?.());
     sim.alpha(0.3).restart();
   }, [spread]);
 
@@ -155,6 +166,10 @@ export default function GraphView({ layer, topic = 'all', preset, spread, select
   useEffect(() => {
     fitRef.current?.(true);
   }, [selectedId]);
+
+  useEffect(() => {
+    fitRef.current?.(true);
+  }, [walkKey]);
 
   const simNodes = nodesRef.current;
   const nodeEls = new Map();
@@ -198,7 +213,9 @@ export default function GraphView({ layer, topic = 'all', preset, spread, select
   function unpinAll() {
     clearPins(layer, preset);
     for (const n of nodesRef.current) { n.fx = null; n.fy = null; }
-    simRef.current?.alpha(0.5).restart();
+    const sim = simRef.current;
+    sim?.on('end.refit', () => fitRef.current?.());
+    sim?.alpha(0.5).restart();
     setTick(t => t + 1);
   }
 

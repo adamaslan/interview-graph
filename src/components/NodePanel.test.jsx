@@ -35,4 +35,12 @@ describe('NodePanel quiz rendering', () => {
       }
     }
   });
+
+  it('renders self-test mode from parent state so it can survive node remounts', () => {
+    const html = renderToStaticMarkup(
+      <NodePanel nodeId="py-conc-gil" selfTest onSelfTestChange={() => {}} onSelect={() => {}} onClose={() => {}} />
+    );
+    expect(html).toContain('Self-test on');
+    expect(html).toContain('tp-hidden');
+  });
 });

@@ -40,13 +40,10 @@ function QuizItem({ item, index }) {
   );
 }
 
-export default function NodePanel({ nodeId, onSelect, onClose }) {
+export default function NodePanel({ nodeId, selfTest = false, onSelfTestChange = () => {}, onSelect, onClose }) {
   const node = nodeBy(nodeId);
-  const [selfTest, setSelfTest] = useState(false);
   const [revealed, setRevealed] = useState(new Set());
   const [secondsLeft, setSecondsLeft] = useState(null);
-
-  useEffect(() => { setRevealed(new Set()); setSecondsLeft(null); }, [nodeId]);
 
   useEffect(() => {
     if (secondsLeft === null || secondsLeft <= 0) return;
@@ -111,7 +108,7 @@ export default function NodePanel({ nodeId, onSelect, onClose }) {
       <section>
         <div className="flex items-center justify-between">
           <h3 className="text-sm font-semibold">Talking points</h3>
-          <button className={`ctl ${selfTest ? 'active' : ''}`} onClick={() => setSelfTest(v => !v)}
+          <button className={`ctl ${selfTest ? 'active' : ''}`} onClick={() => onSelfTestChange(!selfTest)}
             title="Blur the points until you reveal each one - cover, speak, check">
             {selfTest ? 'Self-test on' : 'Self-test'}
           </button>
