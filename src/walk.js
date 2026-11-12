@@ -6,7 +6,7 @@ import { NODES, EDGES, DEGREE, nodeBy } from './data/graphData';
 /** Default minutes per stop, by node type. Exercises are timed reps. */
 export const MINUTES_BY_TYPE = {
   service: 6, frontend: 5, datastore: 6, scheduler: 6,
-  concept: 5, incident: 4, aws: 3, gha: 4,
+  solution: 5, concept: 5, incident: 4, aws: 3, gha: 4,
   exercise: null, // exercises use their own timeboxMin
 };
 
