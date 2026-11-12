@@ -3,8 +3,8 @@ import { SOLUTION_NODES, SOLUTION_EDGES, SOLUTION_IDS, SOLUTION_CONVERSATION_IDS
 import { layerGraph, nodeBy, edgesFor } from './graphData';
 import { NODES as BASE_NODES } from './baseData';
 describe('66degrees public study bridge', () => {
-  it('has fourteen sourced study nodes and eight existing technical anchors', () => {
-    expect(SOLUTION_NODES).toHaveLength(14);
+  it('has seventeen sourced study nodes and eight existing technical anchors', () => {
+    expect(SOLUTION_NODES).toHaveLength(17);
     const anchors = SOLUTION_IDS.filter(id => !id.startsWith('s-'));
     expect(anchors).toHaveLength(8);
     for (const id of anchors) expect(BASE_NODES.some(n => n.id === id)).toBe(true);
@@ -31,9 +31,21 @@ describe('66degrees public study bridge', () => {
   it('uses the same curated membership for graph and list, without unrelated nodes', () => {
     const { nodes, edges } = layerGraph('solutions');
     expect(nodes.map(n => n.id).sort()).toEqual([...SOLUTION_IDS].sort());
-    expect(nodes).toHaveLength(22);
+    expect(nodes).toHaveLength(25);
     for (const e of SOLUTION_EDGES) expect(edges).toContainEqual(e);
     expect(nodes.some(n => n.id === 'fe-main-site')).toBe(false);
+  });
+  it('connects run evidence, dashboard decisions and notifications without delivery claims', () => {
+    for (const id of ['s-run-evidence', 's-operator-dashboard', 's-notifications']) {
+      expect(nodeBy(id).summary).toContain('Hypothetical');
+      expect(nodeBy(id).quiz[0].choices).toHaveLength(4);
+      expect(edgesFor(id).length).toBeGreaterThanOrEqual(3);
+    }
+    expect(nodeBy('s-run-evidence').talkingPoints.join(' ')).toContain('Missing evidence is not proof');
+    expect(nodeBy('s-operator-dashboard').talkingPoints.join(' ')).toContain('draft hardening patch is not a shipped fix');
+    expect(nodeBy('s-notifications').talkingPoints.join(' ')).toContain('provider-accepted');
+    expect(nodeBy('s-notifications').talkingPoints.join(' ')).toContain('Proposed measures are not achieved savings');
+    expect(nodeBy('s-run-evidence').sources[0].url).toBe('https://opentelemetry.io/docs/concepts/signals/logs/');
   });
   it('has no dangling bridge edge and keeps the company work hypothetical', () => {
     for (const e of SOLUTION_EDGES) { expect(nodeBy(e.source)).toBeTruthy(); expect(nodeBy(e.target)).toBeTruthy(); }
