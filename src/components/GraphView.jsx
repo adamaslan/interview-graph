@@ -157,7 +157,10 @@ export default function GraphView({ layer, topic = 'all', preset, spread, select
     const sim = simRef.current;
     if (!sim) return;
     applySpacing(sim, { spread, radiusOf, labelMinDegree });
-    sim.on('end.refit', () => fitRef.current?.());
+    sim.on('end.refit', () => {
+      sim.on('end.refit', null);
+      fitRef.current?.();
+    });
     sim.alpha(0.3).restart();
   }, [spread]);
 
@@ -214,7 +217,10 @@ export default function GraphView({ layer, topic = 'all', preset, spread, select
     clearPins(layer, preset);
     for (const n of nodesRef.current) { n.fx = null; n.fy = null; }
     const sim = simRef.current;
-    sim?.on('end.refit', () => fitRef.current?.());
+    sim?.on('end.refit', () => {
+      sim.on('end.refit', null);
+      fitRef.current?.();
+    });
     sim?.alpha(0.5).restart();
     setTick(t => t + 1);
   }
