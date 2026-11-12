@@ -1,17 +1,18 @@
 import React from "react";
 import { useMemo, useState } from 'react';
 import { SOLUTION_CONVERSATION_IDS } from '../data/solutionsData';
-import { NODES, DEGREE, TYPE_LABELS } from '../data/graphData';
+import { NODES, DEGREE, TYPE_LABELS, TOPIC_LABELS, layerGraph } from '../data/graphData';
 
 /** Searchable list of every node - the keyboard-first path into the graph. */
-export default function ListView({ nodeIds, layerTypes, onSelect, selectedId }) {
+export default function ListView({ layer = 'all', topic = 'all', onSelect, selectedId }) {
   const [query, setQuery] = useState('');
 
-  const stakeholderLayer = nodeIds?.includes('s-66degrees');
+  const stakeholderLayer = layer === 'solutions';
   const rows = useMemo(() => {
     const q = query.trim().toLowerCase();
+    const visible = new Set(layerGraph(layer, topic).nodes.map(n => n.id));
     return NODES
-      .filter(n => layerTypes.has(n.type) && (!nodeIds || nodeIds.includes(n.id)))
+      .filter(n => visible.has(n.id))
       .filter(n => !q
         || n.label.toLowerCase().includes(q)
         || n.summary.toLowerCase().includes(q)
@@ -24,7 +25,7 @@ export default function ListView({ nodeIds, layerTypes, onSelect, selectedId }) 
         }
         return (DEGREE.get(b.id) ?? 0) - (DEGREE.get(a.id) ?? 0);
       });
-  }, [query, layerTypes, nodeIds, stakeholderLayer]);
+  }, [query, layer, stakeholderLayer, topic]);
 
   return (
     <div className="panel-scroll h-full overflow-y-auto p-4">
@@ -56,6 +57,7 @@ export default function ListView({ nodeIds, layerTypes, onSelect, selectedId }) 
               onClick={() => onSelect(n.id)}>
               <span className="text-sm font-medium">{n.label}</span>
               <span className="chip ml-2">{TYPE_LABELS[n.type] ?? n.type}</span>
+              {n.topic && <span className="chip ml-2">{TOPIC_LABELS[n.topic] ?? n.topic}</span>}
               <span className="ml-2 text-xs" style={{ color: 'var(--ink-faint)' }}>{DEGREE.get(n.id) ?? 0} links</span>
               <p className="mt-1 line-clamp-2 text-xs" style={{ color: 'var(--ink-soft)' }}>{n.summary}</p>
             </button>

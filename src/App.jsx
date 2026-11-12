@@ -1,5 +1,5 @@
-import { useMemo, useState } from 'react';
-import { LAYERS, nodeBy } from './data/graphData';
+import { useState } from 'react';
+import { LAYERS, nodeBy, PYTHON_TOPICS } from './data/graphData';
 import { LAYOUT_PRESETS, SPREAD_MIN, SPREAD_MAX, SPREAD_DEFAULT } from './graph/forces';
 import { loadSpread, saveSpread } from './graph/pins';
 import { buildWalk } from './walk';
@@ -10,17 +10,15 @@ import { useMediaQuery } from './hooks';
 
 export default function App() {
   const [layer, setLayer] = useState('estate');
+  const [topic, setTopic] = useState('all');
   const [preset, setPreset] = useState('free');
   const [spread, setSpread] = useState(() => loadSpread(SPREAD_DEFAULT));
   const [selectedId, setSelectedId] = useState(null);
+  const [selfTest, setSelfTest] = useState(false);
   const [view, setView] = useState('graph');
   const [walk, setWalk] = useState(null);
   const [walkIndex, setWalkIndex] = useState(0);
   const narrow = useMediaQuery('(max-width: 760px)');
-
-  const layerTypes = useMemo(
-    () => new Set((LAYERS.find(l => l.id === layer) ?? LAYERS[0]).types),
-    [layer]);
 
   function changeSpread(v) {
     setSpread(v);
@@ -53,9 +51,28 @@ export default function App() {
         <nav className="flex flex-wrap gap-1" aria-label="Layers">
           {LAYERS.map(l => (
             <button key={l.id} className={`ctl ${layer === l.id ? 'active' : ''}`}
-              onClick={() => { setLayer(l.id); if (l.id === 'solutions') { setSelectedId('s-66degrees'); setView('list'); } }}>{l.label}</button>
+              aria-pressed={layer === l.id}
+              onClick={() => {
+                setLayer(l.id);
+                setTopic('all');
+                setSelectedId(l.id === 'solutions' ? 's-66degrees' : null);
+                if (l.id === 'solutions') setView('list');
+              }}>{l.label}</button>
           ))}
         </nav>
+
+        {layer === 'python' && (
+          <>
+            <span className="mx-1" style={{ color: 'var(--line)' }}>|</span>
+            <nav className="flex flex-wrap gap-1" aria-label="Python topics">
+              {[{ id: 'all', label: 'All topics' }, ...PYTHON_TOPICS].map(t => (
+                <button key={t.id} className={`ctl ${topic === t.id ? 'active' : ''}`}
+                  aria-pressed={topic === t.id}
+                  onClick={() => { setTopic(t.id); setSelectedId(null); }}>{t.label}</button>
+              ))}
+            </nav>
+          </>
+        )}
 
         <span className="mx-1" style={{ color: 'var(--line)' }}>|</span>
 
@@ -102,6 +119,7 @@ export default function App() {
           {view === 'graph' ? (
             <GraphView
               layer={layer}
+              topic={topic}
               preset={preset}
               spread={spread}
               selectedId={selectedId}
@@ -109,13 +127,14 @@ export default function App() {
               walkIds={walk?.stops.map(s => s.id)}
             />
           ) : (
-            <ListView nodeIds={LAYERS.find(l => l.id === layer)?.nodeIds} layerTypes={layerTypes} onSelect={setSelectedId} selectedId={selectedId} />
+            <ListView layer={layer} topic={topic} onSelect={setSelectedId} selectedId={selectedId} />
           )}
         </div>
         {selectedId && (
           <div className={narrow ? 'max-h-[55%] border-t' : 'w-[380px] shrink-0'}
             style={{ borderColor: 'var(--line)' }}>
-            <NodePanel key={selectedId} nodeId={selectedId} onSelect={setSelectedId} onClose={() => setSelectedId(null)} />
+            <NodePanel key={selectedId} nodeId={selectedId} selfTest={selfTest} onSelfTestChange={setSelfTest}
+              onSelect={setSelectedId} onClose={() => setSelectedId(null)} />
           </div>
         )}
       </main>
