@@ -53,7 +53,7 @@ export default function App() {
         <nav className="flex flex-wrap gap-1" aria-label="Layers">
           {LAYERS.map(l => (
             <button key={l.id} className={`ctl ${layer === l.id ? 'active' : ''}`}
-              onClick={() => setLayer(l.id)}>{l.label}</button>
+              onClick={() => { setLayer(l.id); if (l.id === 'solutions') setSelectedId('s-66degrees'); }}>{l.label}</button>
           ))}
         </nav>
 
@@ -109,13 +109,13 @@ export default function App() {
               walkIds={walk?.stops.map(s => s.id)}
             />
           ) : (
-            <ListView layerTypes={layerTypes} onSelect={setSelectedId} selectedId={selectedId} />
+            <ListView nodeIds={LAYERS.find(l => l.id === layer)?.nodeIds} layerTypes={layerTypes} onSelect={setSelectedId} selectedId={selectedId} />
           )}
         </div>
         {selectedId && (
           <div className={narrow ? 'max-h-[55%] border-t' : 'w-[380px] shrink-0'}
             style={{ borderColor: 'var(--line)' }}>
-            <NodePanel nodeId={selectedId} onSelect={setSelectedId} onClose={() => setSelectedId(null)} />
+            <NodePanel key={selectedId} nodeId={selectedId} onSelect={setSelectedId} onClose={() => setSelectedId(null)} />
           </div>
         )}
       </main>
