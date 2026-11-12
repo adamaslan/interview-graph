@@ -201,7 +201,7 @@ export default function GraphView({ layer, preset, spread, selectedId, onSelect,
                       strokeWidth={t === 3 ? 2.5 : 1.5} />
                   )}
                   {shape === 'diamond' && (
-                    <polygon points={diamond(r + 1)} fill={color}
+                    <path d={diamond(r + 1)} fill={color}
                       stroke={t === 3 ? 'var(--select-1)' : 'var(--paper)'}
                       strokeWidth={t === 3 ? 2.5 : 1.5} />
                   )}
