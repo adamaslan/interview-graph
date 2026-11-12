@@ -47,3 +47,11 @@ npm run preview  # serve the production build
 
 CI (`.github/workflows/pr-build.yml`) runs lint, tests, and build on every PR
 and push to main.
+
+## 66degrees Solutions/FDE study bridge
+
+Choose **66degrees** in the layer bar. Eight public-source study nodes connect to eight existing technical anchors: discovery, reusable service core, identity, evaluation, retry/rollback, live delivery and adoption. Graph and List use the same curated 16-node set. Click a connection to move to the concrete engineering pattern; each new node includes a quick check and public sources.
+
+This is preparation material, not an announcement of an interview, an exact requisition match, or a claim that these systems run at 66degrees. The hypothetical brief workflow is explicitly an exercise. No private interview logistics or contacts are published. Existing estate examples and numbers remain illustrative/historical, not current production metrics.
+
+Public sources checked November 11, 2026: https://66degrees.com/ and https://job-boards.greenhouse.io/66degrees/jobs/6179119004 .
