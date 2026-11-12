@@ -50,8 +50,10 @@ and push to main.
 
 ## 66degrees Solutions/FDE study bridge
 
-Choose **66degrees** in the layer bar. Eight company-themed study nodes connect to eight existing technical anchors: discovery, reusable service core, identity, evaluation, retry/rollback, live delivery and adoption. Graph and List use the same curated 16-node set. This layer opens in List view so its full labels remain readable on phones. Click a connection to move to the concrete engineering pattern; each new node includes a quick check and public sources.
+Choose **66degrees** in the layer bar. Thirteen study nodes connect to eight existing technical anchors. The internal-workflow practice path covers judgment and prioritization, stakeholder trust, discovery, reusable delivery, responsible AI, Workspace, agent design, evaluation, operating cost, rollout, adoption and mentoring. Graph and List use the same curated 21-node set. This layer opens in List view so its full labels remain readable on phones. Click a connection to move to the concrete engineering pattern; each study node includes talking points, a quick check and public background references. The references support the company themes or technical background, not every hypothetical design choice.
 
 This is preparation material, not an announcement of an interview, an exact requisition match, or a claim that these systems run at 66degrees. The hypothetical brief workflow is explicitly an exercise. No private interview logistics or contacts are published. Existing estate examples and numbers remain illustrative/historical, not current production metrics.
 
 Company source checked November 11, 2026: https://66degrees.com/ . The earlier Greenhouse role link is no longer verifiably live and is not used as a current job-description source. Discussion prompts and design examples are study advice, not confirmed requirements for an opening.
+
+Technical background references: https://developers.google.com/workspace/guides/auth-overview and https://google.github.io/adk-docs/ . Internal workflow scenarios are original exercises, not descriptions of private company systems or a reproduced role document. Frameworks and cloud products are options to compare, not a claim about a company stack.
