@@ -122,6 +122,44 @@ export const SOLUTION_NODES = [
     ], 'A pilot shipped, but repeat use was not measured. What can you claim?',
     ['Explain what shipped and say adoption remains unmeasured', 'Present all successful tests as customer adoption', 'Quote illustrative numbers as measured results', 'Avoid mentioning limitations'],
     'A solutions engineer earns trust by keeping implementation, testing, deployment and outcome evidence distinct.'),
+  node('s-pipeline', 'Discovery to production: the whole path',
+    'Practice telling one end-to-end delivery story in plain language: understand the workflow, pick the smallest build, put a cheap check before any expensive step, prove it, ship it behind review, then learn from use. Illustrated with the builder\'s own public projects, not with claims about 66degrees systems.', [
+      'Say the path in six beats: discover the real task -> choose the smallest intervention -> build a narrow slice -> gate it before the costly step -> ship behind review with a rollback route -> measure what people actually did. Each beat has one artifact someone non-technical could look at: a task map, a scope note, a demo, a rejection count, a release note, a usage check.',
+      'The same path appears at different sizes in the builder\'s own work: a signal engine that rejects most candidates before paying for a model, a blog pipeline that turns a source into a reviewed article, and a model-routing job that proposes its own fix as a pull request. Use them as worked examples of the habit, and say plainly that they are self-directed projects, not enterprise engagements.',
+      'The hard part is the handoff between beats. Name who owns each transition and what evidence moves work forward, because most prototype-to-production failures are an unowned handoff rather than a missing model.',
+      'Keep the claim ladder honest: built, tested, deployed, used, and measured are five different statements. Say the highest rung you can defend and name the next one.',
+    ], 'Which statement about a delivered tool is the strongest evidence of value?',
+    ['People kept using it for the real task and the agreed measure moved against a baseline', 'The demo ran without errors', 'The pull request merged', 'The model scored well on a public benchmark'],
+    'Each rung of built, tested, deployed, used and measured is a separate claim; value sits at the top rungs.'),
+  node('s-gate-first', 'Cheap gate before the costly step',
+    'Practice explaining a design decision that controls cost and noise: run inexpensive deterministic checks first, reject most candidates, and only then spend a language model on the survivors. Based on the builder\'s own public signals project; its figures are from an August overview and illustrative here.', [
+      'Mechanism: a scheduled scan reads a universe of roughly a thousand tickers, runs about eighteen independent detectors, scores their agreement and applies a publication gate. Only what passes the gate is sent to a model for a written summary. The ordering is the design: cost, module boundaries and workflow layout all follow from putting the gate before synthesis.',
+      'Number and trade-off: in the August overview roughly four in ten scanned tickers were published, so most of the universe never reaches the model. The trade-off is that a strict gate can hide a good candidate, so the rejection reasons are counted and kept visible rather than discarded.',
+      'Translate it for a non-engineer: before anyone spends expensive review time on a draft, a quick checklist screens out the ones that are obviously incomplete. For an internal brief tool the equivalent gate is required inputs present, sources attached and no restricted content, applied before any model writes a word.',
+      'Boundary: the signals output is educational and carries compliance caveats in the project documentation. Do not present it as advice or as proven returns; the point here is the delivery pattern.',
+    ], 'Why run the publication gate before the language-model step?',
+    ['It rejects most candidates cheaply, so the expensive step only runs on what could be published', 'Language models cannot read structured data', 'It guarantees every published item is correct', 'It removes the need for tests'],
+    'Cheap deterministic filtering first controls cost and noise; it still needs visible rejection reasons and tests.',
+    [{ label: 'TastyTechBytes, the builder\'s technical blog', url: 'https://tastytechbytes.com/' }]),
+  node('s-feedback', 'Close the loop: grade your own output',
+    'Practice describing how a delivered system keeps itself honest: freeze what it predicted, score it later against what happened, and route repairs through human review. Drawn from the builder\'s own public projects; illustrative, not a claim about measured results.', [
+      'Mechanism: freeze a small set of strongest outputs each month so a weak one cannot be swapped out after it starts losing, track them across several horizons from one day to one year with tolerances that widen over longer horizons, and classify each call by outcome and by whether the reasoning was sound. A right answer for a wrong reason is a finding, not a win.',
+      'Operations story: a free-tier model chain silently called retired models for weeks until a weekly job began probing the live catalog. The job proposes a new ranking as a pull request only when it changes, so a person reviews every routing change. Detection, diagnosis, repair and verification are four separate steps; passing a source test does not prove the live provider recovered.',
+      'Translate it: for an internal tool, the feedback loop is a weekly look at accepted versus edited drafts and why people rejected them. Repeated edits become template or retrieval changes. Name the owner of that weekly look before launch.',
+      'Boundary: calibration scripts and a self-grading harness show how to measure; they do not show the measurements improved a business outcome. Say which one you are describing.',
+    ], 'A job rewrites its own configuration when a model is retired. What keeps this safe?',
+    ['It opens a pull request only on change so a person reviews it, with an owner and a rollback route', 'It deploys silently so nobody is interrupted', 'It trusts a passing unit test as proof the provider recovered', 'It removes the fallback chain'],
+    'Automation can propose; a reviewer decides, and live-state proof is separate from a source-level test.'),
+  node('s-explain', 'Make complex engineering understandable',
+    'Practice the translation skill the role asks for: explain a technical system so a non-engineer can decide something. Illustrated by a technical blog written in a fixed, plain structure, and by writing a design narrative for mixed audiences.', [
+      'Structure that works for mixed audiences: lead with what changed and why it matters, show one picture of the flow, give a short list of takeaways, then put methodology, limits and sources at the end. The builder\'s blog follows a house structure with a diagram first, a summary, takeaways, detail and attribution, so a reader can stop at any depth and still have the right idea.',
+      'Say the same system three ways. To an executive: what it costs, what it risks and what decision is needed. To a colleague who will use it: what to put in, what comes out and when not to trust it. To an engineer: the boundary, the failure modes and the tests. Practice switching without changing the facts.',
+      'Cite sources and name limits in the article itself. A review pass catches content, accessibility and correctness problems before publishing, but in the blog it is a manual convention rather than an enforced gate, so describe it that way instead of calling it a control.',
+      'Use the written artifact as a handoff: a scope note, a roadmap and a design narrative that a stakeholder can challenge. If they cannot summarize it back, the explanation is not done.',
+    ], 'A stakeholder cannot summarize your design back to you. What is the best next step?',
+    ['Re-explain at their level of decision, with one diagram and the limits, then check again', 'Add more technical detail', 'Assume they will trust the result anyway', 'Send the code instead'],
+    'Understanding is shown by the listener restating it; the explanation should be adjusted until they can.',
+    [{ label: 'TastyTechBytes, the builder\'s technical blog', url: 'https://tastytechbytes.com/' }]),
 ];
 export const SOLUTION_EDGES = [
   ['s-66degrees', 's-discovery'], ['s-66degrees', 's-core'], ['s-66degrees', 's-governance'],
@@ -139,6 +177,11 @@ export const SOLUTION_EDGES = [
   ['s-governance', 'c-oidc-vs-bearer'], ['s-evals', 'i-free-model-failures'],
   ['s-rollout', 'c-idempotency'], ['s-rollout', 'c-revisions'], ['s-rollout', 'c-deploy-gap'],
   ['s-adoption', 'i-free-model-failures'], ['s-adoption', 'gha-bot-prs'], ['s-questions', 's-discovery'],
+  ['s-66degrees', 's-pipeline'], ['s-pipeline', 's-discovery'], ['s-pipeline', 's-gate-first'], ['s-pipeline', 's-feedback'],
+  ['s-pipeline', 's-explain'], ['s-pipeline', 's-rollout'], ['s-pipeline', 's-adoption'],
+  ['s-gate-first', 's-evals'], ['s-gate-first', 's-core'], ['s-gate-first', 'svc-data-api'],
+  ['s-feedback', 's-evals'], ['s-feedback', 'i-free-model-failures'], ['s-feedback', 'gha-bot-prs'], ['s-feedback', 'c-deploy-gap'],
+  ['s-explain', 's-trust'], ['s-explain', 's-questions'], ['s-explain', 's-mentoring'],
 ].map(([source, target]) => ({ source, target, kind: 'relates_to' }));
 export const SOLUTION_IDS = [...new Set([...SOLUTION_NODES.map(n => n.id), ...SOLUTION_EDGES.flatMap(e => [e.source, e.target])])];
 
