@@ -3,8 +3,8 @@ import { SOLUTION_NODES, SOLUTION_EDGES, SOLUTION_IDS } from './solutionsData';
 import { layerGraph, nodeBy, edgesFor } from './graphData';
 import { NODES as BASE_NODES } from './baseData';
 describe('66degrees public study bridge', () => {
-  it('has eight sourced study nodes and eight existing technical anchors', () => {
-    expect(SOLUTION_NODES).toHaveLength(8);
+  it('has thirteen sourced study nodes and eight existing technical anchors', () => {
+    expect(SOLUTION_NODES).toHaveLength(13);
     const anchors = SOLUTION_IDS.filter(id => !id.startsWith('s-'));
     expect(anchors).toHaveLength(8);
     for (const id of anchors) expect(BASE_NODES.some(n => n.id === id)).toBe(true);
@@ -15,10 +15,18 @@ describe('66degrees public study bridge', () => {
       expect(edgesFor(n.id).length).toBeGreaterThan(0);
     }
   });
+  it('covers judgment, adoption, mentoring and production trade-offs as practice', () => {
+    for (const id of ['s-judgment', 's-workspace', 's-agents', 's-operations', 's-mentoring']) {
+      expect(nodeBy(id).quiz[0].choices).toHaveLength(4);
+      expect(nodeBy(id).quiz[0].why.length).toBeGreaterThan(30);
+    }
+    expect(nodeBy('s-66degrees').summary).toContain('hypothetical practice');
+    expect(nodeBy('s-workspace').sources[0].url).toBe('https://developers.google.com/workspace/guides/auth-overview');
+  });
   it('uses the same curated membership for graph and list, without unrelated nodes', () => {
     const { nodes, edges } = layerGraph('solutions');
     expect(nodes.map(n => n.id).sort()).toEqual([...SOLUTION_IDS].sort());
-    expect(nodes).toHaveLength(16);
+    expect(nodes).toHaveLength(21);
     for (const e of SOLUTION_EDGES) expect(edges).toContainEqual(e);
     expect(nodes.some(n => n.id === 'fe-main-site')).toBe(false);
   });
