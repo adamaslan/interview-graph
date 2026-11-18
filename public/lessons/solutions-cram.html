@@ -1,0 +1,278 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="description" content="Public-safe interview practice: discovery, cloud systems, prototypes, documents and evidence."><title>Solutions interview cram | Interview graph</title><style>
+:root{color-scheme:light dark;--bg:#f7f3ea;--paper:#fffdf7;--ink:#1c1917;--soft:#57534e;--line:#d6cfc2;--accent:#2f5d50}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:17px/1.7 system-ui,sans-serif}header,main,footer{max-width:880px;margin:auto;padding:24px}header{border-bottom:1px solid var(--line);display:flex;gap:16px;flex-wrap:wrap;align-items:center}header strong{margin-right:auto}a{color:var(--accent);text-underline-offset:3px}a:focus-visible,button:focus-visible,summary:focus-visible{outline:3px solid var(--accent);outline-offset:3px}h1{font-size:clamp(32px,6vw,52px);line-height:1.12;letter-spacing:-.035em;margin:30px 0 20px}h2{font-size:27px;line-height:1.3;border-top:1px solid var(--line);padding-top:34px;margin-top:44px;scroll-margin-top:20px}h3{font-size:20px;margin-top:30px}p,li{overflow-wrap:anywhere}blockquote{margin:24px 0;padding:4px 24px;border-left:4px solid var(--accent);background:var(--paper)}table{width:100%;border-collapse:collapse;font-size:15px;display:block;overflow-x:auto}td,th{padding:12px;text-align:left;border:1px solid var(--line);min-width:110px}th{background:var(--paper)}pre{overflow:auto;padding:20px;background:var(--paper);border:1px solid var(--line)}code{font-size:.9em}.toc{background:var(--paper);padding:16px 24px;border:1px solid var(--line);border-radius:8px}.toc ul{padding-left:22px}button,.download{font:inherit;background:var(--paper);color:var(--accent);padding:7px 12px;border:1px solid var(--line);border-radius:6px;cursor:pointer}footer{border-top:1px solid var(--line);font-size:14px;color:var(--soft)}@media(max-width:500px){header,main,footer{padding:18px}body{font-size:16px}h2{font-size:24px}blockquote{padding-left:16px}table{font-size:14px}}@media(prefers-color-scheme:dark){:root{--bg:#191715;--paper:#221f1c;--ink:#ede7dc;--soft:#b8b0a4;--line:#4a433b;--accent:#9bc9b9}}@media print{header button,.download{display:none}body{background:white;color:black;font-size:11pt}header,main,footer{max-width:none;padding:0}h2{break-after:avoid}table,blockquote{break-inside:avoid}a{color:inherit}.toc{display:none}}
+</style></head><body><header><strong>INTERVIEW GRAPH / STUDY</strong><a href="../">Back to graph</a><a class="download" href="solutions-cram.md" download>Download Markdown</a><button type="button" onclick="window.print()">Print</button></header><main><nav aria-label="On this page"><details><summary>On this page</summary><div class="toc">
+<ul>
+<li><a href="#the-60-minute-rehearsal">The 60-minute rehearsal</a></li>
+<li><a href="#0-5-lead-with-discovery">0-5: Lead with discovery</a></li>
+<li><a href="#5-15-explain-the-gcp-work-as-a-system">5-15: Explain the GCP work as a system</a></li>
+<li><a href="#15-25-connect-figma-and-rich-interactive-html">15-25: Connect Figma and rich interactive HTML</a></li>
+<li><a href="#25-35-docs-and-reusable-claude-skills">25-35: Docs and reusable Claude skills</a></li>
+<li><a href="#35-47-end-to-end-case-reviewed-solution-briefs">35-47: End-to-end case, reviewed solution briefs</a></li>
+<li><a href="#47-55-challenge-round">47-55: Challenge round</a></li>
+<li><a href="#55-60-questions-and-close">55-60: Questions and close</a></li>
+<li><a href="#final-five-minute-checklist">Final five-minute checklist</a></li>
+<li><a href="#background-reading">Background reading</a></li>
+</ul>
+</div>
+</details></nav><article><h1 id="solutions-interview-cram">Solutions interview cram</h1>
+<p>A one-hour rehearsal for turning technical work into a useful conversation with a solutions leader.</p>
+<p><strong>Start with the person and the problem. Keep the architecture ready, not in the way.</strong></p>
+<p>This is a public practice guide. Scenarios are hypothetical, not claims about an employer's internal systems or the author's accomplishments. Fill in your own verified examples before rehearsing. Use this before an interview, not as unapproved live assistance.</p>
+<h2 id="the-60-minute-rehearsal">The 60-minute rehearsal</h2>
+<table>
+<thead>
+<tr>
+<th>Minutes</th>
+<th>Focus</th>
+<th>Your output</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>0-5</td>
+<td>Opening and discovery</td>
+<td>A 60-second introduction and five discovery questions</td>
+</tr>
+<tr>
+<td>5-15</td>
+<td>GCP architecture</td>
+<td>One request path, one failure path, one trade-off</td>
+</tr>
+<tr>
+<td>15-25</td>
+<td>Figma and interactive HTML</td>
+<td>A stakeholder flow and a testable prototype decision</td>
+</tr>
+<tr>
+<td>25-35</td>
+<td>Docs and reusable Claude skills</td>
+<td>A handoff contract and a bounded automation workflow</td>
+</tr>
+<tr>
+<td>35-47</td>
+<td>End-to-end solutions case</td>
+<td>A thin pilot with an owner, a gate and a success measure</td>
+</tr>
+<tr>
+<td>47-55</td>
+<td>Challenge round</td>
+<td>Honest answers to five difficult follow-ups</td>
+</tr>
+<tr>
+<td>55-60</td>
+<td>Questions and close</td>
+<td>Two questions and a concise summary</td>
+</tr>
+</tbody>
+</table>
+<p>This is a rehearsal schedule, not a prediction of an interview agenda. If you have only ten minutes, rehearse the opening, the end-to-end case and the evidence ladder.</p>
+<h2 id="0-5-lead-with-discovery">0-5: Lead with discovery</h2>
+<h3 id="opening-scaffold">Opening scaffold</h3>
+<p>Practice this in your own words. Replace the brackets with facts you can defend.</p>
+<blockquote>
+<p>I like turning a messy internal workflow into something people can actually use. I start with who is doing the work, where time or trust is lost, and what would count as a better outcome. Then I make the smallest useful prototype, test it with the people doing the work, and add the cloud and automation pieces that earn their place. A useful example is [verified project]: the problem was [problem], my contribution was [specific work], and the evidence so far is [demo, test or measured result].</p>
+</blockquote>
+<p>Do not read out every tool you know. Name the workflow first, then use GCP, Figma, HTML, docs and Claude skills as supporting choices.</p>
+<h3 id="five-questions-to-ask-before-designing">Five questions to ask before designing</h3>
+<ol>
+<li>Who performs the task, who approves it and who handles exceptions?</li>
+<li>What happens today, including the spreadsheet, email or manual workaround?</li>
+<li>Which mistake is expensive or hard to reverse?</li>
+<li>What data may the tool see, and whose permissions should it use?</li>
+<li>What would make a small pilot worth continuing after two weeks?</li>
+</ol>
+<p><strong>Quick check:</strong> A stakeholder asks for an agent. Do you begin with a framework comparison or ask them to walk through their last real example? Start with the example. You may discover that a form, search page or deterministic check is enough.</p>
+<h2 id="5-15-explain-the-gcp-work-as-a-system">5-15: Explain the GCP work as a system</h2>
+<h3 id="a-two-minute-request-path">A two-minute request path</h3>
+<p>Use the graph's Estate and Depth layers to rehearse a generic frontend → API → datastore path. Explain the boundary at each hop:</p>
+<ul>
+<li>The browser presents the task and displays loading, empty, denied and error states.</li>
+<li>The API validates input, authenticates the caller and checks authorization for the requested action.</li>
+<li>A service identity gets only the permissions needed for its backend work. Caller identity and runtime identity are different questions.</li>
+<li>A datastore holds durable records. A cache speeds reads but is not automatically the source of truth.</li>
+<li>A scheduler starts recurring work. Jobs need idempotency, bounded retries and an observable final state.</li>
+<li>Logs and metrics should connect a failed user task to a specific run or request without exposing secrets.</li>
+</ul>
+<p>Cloud Run is one option for a container-based HTTP service or batch workload. Do not turn that into an assertion that every service, job or event-driven workload has the same execution model. Be ready to explain why the chosen product fits the workload.</p>
+<h3 id="the-questions-behind-the-product-names">The questions behind the product names</h3>
+<table>
+<thead>
+<tr>
+<th>Decision</th>
+<th>Explain it to a stakeholder</th>
+<th>Technical follow-up</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Managed container service</td>
+<td>Less server maintenance for this workload</td>
+<td>Startup, concurrency, identity and limits</td>
+</tr>
+<tr>
+<td>Scheduled batch</td>
+<td>Work runs at a known cadence</td>
+<td>Retry policy, duplicate triggers and partial failure</td>
+</tr>
+<tr>
+<td>Document store or analytical warehouse</td>
+<td>Store operational records and analyze large datasets differently</td>
+<td>Query shape, consistency and scan cost</td>
+</tr>
+<tr>
+<td>Frontend hosting</td>
+<td>Fast delivery of the user interface</td>
+<td>Build output, environment boundaries and rollback</td>
+</tr>
+<tr>
+<td>Observability</td>
+<td>Know whether the task succeeded and what needs attention</td>
+<td>Run IDs, freshness, alerts and access controls</td>
+</tr>
+</tbody>
+</table>
+<h3 id="aws-and-vercel-crossover">AWS and Vercel crossover</h3>
+<p>Compare responsibilities, not logos. For any proposed equivalent, discuss execution model, identity, scaling, data access and operational burden. A managed container service, Lambda function and Kubernetes workload are not interchangeable just because all can run code. Frontend hosting does not remove the need for backend authorization.</p>
+<p><strong>Rehearsal:</strong> Explain one deployment from source change to user-visible behavior. Include build, tests, artifact, environment configuration, release, health check and rollback. Distinguish configuration you inspected from configuration you have only documented.</p>
+<h3 id="evidence-ladder-avoid-accidental-overclaiming">Evidence ladder: avoid accidental overclaiming</h3>
+<ul>
+<li><strong>Designed:</strong> a proposed architecture or document exists.</li>
+<li><strong>Implemented locally:</strong> code exists; name the tests and their scope.</li>
+<li><strong>Reviewed:</strong> someone examined a particular revision.</li>
+<li><strong>Merged:</strong> the code entered the target branch.</li>
+<li><strong>Deployed:</strong> an environment is running that revision.</li>
+<li><strong>Used:</strong> a person completed a real task.</li>
+<li><strong>Measured:</strong> a defined outcome changed over a stated period.</li>
+</ul>
+<p>Terraform validation does not prove a configuration matches a live estate, can apply successfully or is low cost. A Dockerfile is not a running service. Parameterized SQL is not validated against real data until its schema and behavior are checked. A cost target is not an achieved bill.</p>
+<h2 id="15-25-connect-figma-and-rich-interactive-html">15-25: Connect Figma and rich interactive HTML</h2>
+<h3 id="figma-make-a-decision-before-writing-the-whole-application">Figma: make a decision before writing the whole application</h3>
+<p>Use a prototype to test the workflow, not to prove the backend works. Show the starting point, the main action, the result and the recovery path. Ask a representative user to complete a task without coaching.</p>
+<p>A useful hypothetical flow is a solution brief review:</p>
+<ol>
+<li>Choose an approved request.</li>
+<li>Inspect source evidence and missing fields.</li>
+<li>Review a generated draft with uncertainty visible.</li>
+<li>Edit or reject it.</li>
+<li>Approve the final version for its intended audience.</li>
+</ol>
+<p>Ask: Where did the user hesitate? Did they understand draft versus approved? Could they recover from missing information? Bring those observations back into the design.</p>
+<h3 id="rich-html-sometimes-called-deluxe-html">Rich HTML, sometimes called "deluxe HTML"</h3>
+<p>Treat this as an informal description of an interactive deliverable, not a separate technology or a claim about a shipped product. A rich HTML report can combine a readable summary, filters, expandable evidence, charts, a decision table and clear next actions.</p>
+<p>The interview graph itself is a public example of interactive study content: connected topics, graph/list views, quick checks and timed practice. It demonstrates an interaction pattern, not measured adoption or business impact.</p>
+<h3 id="choose-the-simplest-useful-artifact">Choose the simplest useful artifact</h3>
+<table>
+<thead>
+<tr>
+<th>Artifact</th>
+<th>Good fit</th>
+<th>Do not claim it proves</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Figma prototype</td>
+<td>Validate flow and visual hierarchy</td>
+<td>A working integration or secure backend</td>
+</tr>
+<tr>
+<td>Markdown document</td>
+<td>Versioned requirements, decisions and handoff</td>
+<td>User adoption</td>
+</tr>
+<tr>
+<td>Static HTML report</td>
+<td>Readable evidence with light interaction</td>
+<td>A live data pipeline</td>
+</tr>
+<tr>
+<td>Application dashboard</td>
+<td>Repeated tasks with current data and permissions</td>
+<td>Correctness without tests and source checks</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Practice prompt:</strong> A leader wants an impressive dashboard tomorrow, but the data feed is incomplete. Offer a clearly dated report with missing-data states and a clickable prototype of the proposed dashboard. Do not fake live numbers.</p>
+<h3 id="what-makes-the-html-professional">What makes the HTML professional</h3>
+<p>Semantic headings, keyboard access, visible focus, labelled controls, readable contrast, mobile layout, useful empty states and print output. A beautiful chart must still explain its source, time range and missing data. Check actual desktop and phone pixels, not only a successful build.</p>
+<h2 id="25-35-docs-and-reusable-claude-skills">25-35: Docs and reusable Claude skills</h2>
+<h3 id="documentation-is-part-of-delivery">Documentation is part of delivery</h3>
+<p>Use different documents for different jobs:</p>
+<ul>
+<li><strong>Brief:</strong> user, problem, constraints, non-goals and success measure.</li>
+<li><strong>Decision record:</strong> options, trade-offs, chosen path and what would change the decision.</li>
+<li><strong>Implementation handoff:</strong> inputs, outputs, interfaces, dependencies and acceptance tests.</li>
+<li><strong>Runbook:</strong> how to detect failure, investigate it, recover and escalate.</li>
+<li><strong>Evidence report:</strong> exact revision, checks run, observed results and what remains unverified.</li>
+</ul>
+<p>A long document is not automatically a useful handoff. Ask someone else to follow it, then repair the gaps they hit.</p>
+<h3 id="explain-a-claude-skill-without-hype">Explain a Claude skill without hype</h3>
+<p>A Claude skill packages reusable instructions and supporting resources for a recurring task. It can make a workflow more consistent, but it does not make the output correct by definition or grant permission to act.</p>
+<p>For a hypothetical document-review skill, specify:</p>
+<ol>
+<li><strong>Trigger:</strong> an approved document needs review against a named rubric.</li>
+<li><strong>Inputs:</strong> the document, audience, source references and review criteria.</li>
+<li><strong>Steps:</strong> extract claims, check evidence, flag gaps, suggest edits.</li>
+<li><strong>Output:</strong> a review with evidence links and clearly marked uncertainty.</li>
+<li><strong>Limits:</strong> no secret retrieval, no invented sources and no automatic external sending.</li>
+<li><strong>Evaluation:</strong> normal examples, missing evidence, contradictory facts and malicious instructions embedded in source content.</li>
+<li><strong>Human gate:</strong> an accountable reviewer approves any outward-facing result.</li>
+</ol>
+<p>These are design prompts for the candidate's own workflows. They are not a description of any private assistant implementation.</p>
+<h3 id="the-hard-question-why-not-just-use-a-prompt">The hard question: "Why not just use a prompt?"</h3>
+<p>A one-off prompt may be enough for one task. A reusable skill is useful when the workflow repeats and needs maintained examples, checks and resources. More structure also means maintenance cost. Start small, compare outputs on a fixed evaluation set and keep it only if it earns the added complexity.</p>
+<p><strong>Practice:</strong> Describe one workflow using a reusable checklist, then explain what you would test before allowing it to update a system or contact another person.</p>
+<h2 id="35-47-end-to-end-case-reviewed-solution-briefs">35-47: End-to-end case, reviewed solution briefs</h2>
+<p>Hypothetical scenario: a solution team spends time assembling briefs from approved internal material. Drafts are inconsistent and reviewers cannot easily trace claims to sources. This is a scenario to investigate, not an assertion about a specific company.</p>
+<h3 id="work-through-it-out-loud">Work through it out loud</h3>
+<p><strong>Discover:</strong> Interview an author, an approver and an operations owner. Collect a few approved examples and the current review steps. Confirm which sources are allowed and which outputs require approval.</p>
+<p><strong>Define:</strong> A useful pilot produces an editable draft with source references, a missing-information section and a review state. It does not send proposals, promise pricing or invent customer commitments.</p>
+<p><strong>Prototype:</strong> Test a Figma flow with a small sample of users. Can they distinguish evidence, suggestion and final approval? Use the feedback to reduce ambiguity before implementing.</p>
+<p><strong>Build the thin slice:</strong> A small form submits a bounded request to an authenticated API. Retrieve only approved material the user may access. Apply deterministic checks before an optional model call. Save the draft and evidence together. Require review before sharing.</p>
+<p><strong>Operate:</strong> Give every run an ID, timestamps and a truthful status. Show partial, stale and failed runs as such. Use bounded retries and duplicate protection. Record useful diagnostic information, not confidential source content by default.</p>
+<p><strong>Evaluate:</strong> Compare a fixed set of representative requests. Check factual support, missing requirements, reviewer edits, time to an approved output and failure cases. Include an example that should be declined or escalated.</p>
+<p><strong>Roll out:</strong> Start with a small opt-in group, a named owner and a rollback path. Review failures before expanding access. Do not use a good-looking demo as evidence that the workflow is safe or adopted.</p>
+<h3 id="the-stakeholder-summary">The stakeholder summary</h3>
+<blockquote>
+<p>The first goal is not to automate the whole process. It is to help a reviewer get to a trustworthy brief faster. I would start with a narrow draft-and-review flow, keep sources visible, measure reviewer effort and errors, and only expand after the pilot shows it helps.</p>
+</blockquote>
+<h3 id="proposed-measures-not-achieved-results">Proposed measures, not achieved results</h3>
+<p>Baseline the current process first. Then compare median time to an approved brief, unsupported-claim rate, reviewer edit burden, completion rate and operating cost per accepted output. Define the sample, time period and failure treatment. Do not invent a percentage improvement.</p>
+<h2 id="47-55-challenge-round">47-55: Challenge round</h2>
+<h3 id="what-did-you-personally-build">"What did you personally build?"</h3>
+<p>Name your exact contribution. Separate your design, implementation, integration and verification from collaborators' work and generated code. Explain how you checked the result. Do not say you wrote every line if you directed and reviewed AI-assisted implementation.</p>
+<h3 id="the-demo-works-why-isnt-it-ready">"The demo works. Why isn't it ready?"</h3>
+<p>A demo may not cover permissions, real data, failures, accessibility, operating cost or rollback. Name the remaining acceptance checks and the smallest safe pilot rather than hiding behind a vague production-ready label.</p>
+<h3 id="the-stakeholder-wants-everything-now">"The stakeholder wants everything now."</h3>
+<p>Restate the outcome, identify the risky assumption and offer two scoped paths. For example: a reviewed static report this week, or a narrower live integration with an owner and explicit acceptance checks. Explain what each leaves out.</p>
+<h3 id="why-use-ai-at-all">"Why use AI at all?"</h3>
+<p>Use deterministic rules for stable checks. Consider AI when interpretation or drafting earns its cost and uncertainty. Keep a non-AI baseline. Refuse to automate an action whose error cost is higher than the value of removing review.</p>
+<h3 id="what-if-nobody-uses-it">"What if nobody uses it?"</h3>
+<p>Watch a real task, check whether it fits the existing workflow, ask what users still do outside the tool and remove friction. Usage alone is not success, but absence of repeat useful tasks is a reason to revisit the problem.</p>
+<h2 id="55-60-questions-and-close">55-60: Questions and close</h2>
+<p>Choose two questions, then listen:</p>
+<ul>
+<li>Which internal workflow would you most want a new engineer to understand in their first month?</li>
+<li>Where does a useful prototype usually get stuck on the way to regular use?</li>
+<li>Who owns adoption and operational support after the first pilot?</li>
+<li>What evidence would make you trust a small AI-assisted workflow enough to expand it?</li>
+</ul>
+<p>Close by connecting one demonstrated strength to one concrete need you heard. Avoid a second tool inventory.</p>
+<h2 id="final-five-minute-checklist">Final five-minute checklist</h2>
+<ul>
+<li>Can I explain one user problem without naming a framework?</li>
+<li>Can I show how GCP, Figma, HTML, docs and reusable skills support that same workflow?</li>
+<li>Do I know which examples are designed, tested, deployed, used or measured?</li>
+<li>Can I explain a failure and what I learned without inventing an accomplishment?</li>
+<li>Have I removed confidential data, private links, contact details and secrets from anything I may show?</li>
+<li>Can I give the short version, then offer technical depth if asked?</li>
+</ul>
+<h2 id="background-reading">Background reading</h2>
+<p>These references support concepts, not claims about an employer or any private project:</p>
+<ul>
+<li><a href="https://docs.anthropic.com/en/docs/agents-and-tools/agent-skills/overview">Claude Agent Skills overview</a></li>
+<li><a href="https://help.figma.com/hc/en-us/articles/360040314193-Guide-to-prototyping-in-Figma">Figma guide to prototyping</a></li>
+<li><a href="https://www.w3.org/WAI/tutorials/page-structure/">W3C page structure tutorial</a></li>
+</ul>
+<p>Use the existing graph's Estate, Depth, AWS map, GHA and 66degrees layers for related technical and stakeholder practice. Product limits and prices change; check current official documentation before making a real deployment decision.</p></article></main><footer>Practice material. Examples are hypothetical unless explicitly labelled otherwise. No private recruiting details or project artifacts are included.</footer></body></html>
