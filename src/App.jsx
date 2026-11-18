@@ -47,6 +47,7 @@ export default function App() {
       <header className="flex flex-wrap items-center gap-2 border-b px-3 py-2"
         style={{ borderColor: 'var(--line)' }}>
         <h1 className="mr-2 text-base font-semibold">Interview graph</h1>
+        <a href="./lessons/solutions-cram.html" className="text-xs underline" style={{ color: 'var(--fam-infra)' }}>Solutions cram · 1h</a>
 
         <nav className="flex flex-wrap gap-1" aria-label="Layers">
           {LAYERS.map(l => (
