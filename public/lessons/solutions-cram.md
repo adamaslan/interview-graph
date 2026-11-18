@@ -4,7 +4,7 @@ A one-hour rehearsal for turning technical work into a useful conversation with 
 
 **Start with the person and the problem. Keep the architecture ready, not in the way.**
 
-This is a public practice guide. Scenarios are hypothetical, not claims about an employer's internal systems or the author's accomplishments. Fill in your own verified examples before rehearsing. Use this before an interview, not as unapproved live assistance.
+Connect five strengths into one story: understand the task, prototype the flow, build the cloud path, make the evidence readable, and leave a useful handoff. Rehearse out loud; offer the short answer first, then the technical depth.
 
 ## The 60-minute rehearsal
 
