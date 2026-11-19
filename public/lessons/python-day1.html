@@ -1,0 +1,530 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="description" content="Public-safe interview practice: discovery, cloud systems, prototypes, documents and evidence."><title>Day 1: rebuild your Python fundamentals | Interview graph</title><style>
+:root{color-scheme:light dark;--bg:#f7f3ea;--paper:#fffdf7;--ink:#1c1917;--soft:#57534e;--line:#d6cfc2;--accent:#2f5d50}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:17px/1.7 system-ui,sans-serif}header,main,footer{max-width:880px;margin:auto;padding:24px}header{border-bottom:1px solid var(--line);display:flex;gap:16px;flex-wrap:wrap;align-items:center}header strong{margin-right:auto}a{color:var(--accent);text-underline-offset:3px}a:focus-visible,button:focus-visible,summary:focus-visible{outline:3px solid var(--accent);outline-offset:3px}h1{font-size:clamp(32px,6vw,52px);line-height:1.12;letter-spacing:-.035em;margin:30px 0 20px}h2{font-size:27px;line-height:1.3;border-top:1px solid var(--line);padding-top:34px;margin-top:44px;scroll-margin-top:20px}h3{font-size:20px;margin-top:30px}p,li{overflow-wrap:anywhere}blockquote{margin:24px 0;padding:4px 24px;border-left:4px solid var(--accent);background:var(--paper)}table{width:100%;border-collapse:collapse;font-size:15px;display:block;overflow-x:auto}td,th{padding:12px;text-align:left;border:1px solid var(--line);min-width:110px}th{background:var(--paper)}pre{overflow:auto;padding:20px;background:var(--paper);border:1px solid var(--line)}code{font-size:.9em}.toc{background:var(--paper);padding:16px 24px;border:1px solid var(--line);border-radius:8px}.toc ul{padding-left:22px}button,.download{font:inherit;background:var(--paper);color:var(--accent);padding:7px 12px;border:1px solid var(--line);border-radius:6px;cursor:pointer}footer{border-top:1px solid var(--line);font-size:14px;color:var(--soft)}@media(max-width:500px){header,main,footer{padding:18px}body{font-size:16px}h2{font-size:24px}blockquote{padding-left:16px}table{font-size:14px}}@media(prefers-color-scheme:dark){:root{--bg:#191715;--paper:#221f1c;--ink:#ede7dc;--soft:#b8b0a4;--line:#4a433b;--accent:#9bc9b9}}@media print{header button,.download{display:none}body{background:white;color:black;font-size:11pt}header,main,footer{max-width:none;padding:0}h2{break-after:avoid}table,blockquote{break-inside:avoid}a{color:inherit}.toc{display:none}}
+</style></head><body><header><strong>INTERVIEW GRAPH / STUDY</strong><a href="../">Back to graph</a><a class="download" href="python-day1.md" download>Download Markdown</a><button type="button" onclick="window.print()">Print</button></header><main><nav aria-label="On this page"><details><summary>On this page</summary><div class="toc">
+<ul>
+<li><a href="#your-240-minute-route">Your 240-minute route</a></li>
+<li><a href="#0-25-choose-then-justify">0-25: choose, then justify</a></li>
+<li><a href="#25-55-rebuild-the-ideas">25-55: rebuild the ideas</a></li>
+<li><a href="#55-60-break">55-60: break</a></li>
+<li><a href="#60-90-predict-and-explain">60-90: predict and explain</a></li>
+<li><a href="#90-115-guided-practice">90-115: guided practice</a></li>
+<li><a href="#115-120-break">115-120: break</a></li>
+<li><a href="#120-155-independent-practice">120-155: independent practice</a></li>
+<li><a href="#155-175-debug-and-protect-the-fix">155-175: debug and protect the fix</a></li>
+<li><a href="#175-180-break">175-180: break</a></li>
+<li><a href="#180-220-capstone-event-report">180-220: capstone event report</a></li>
+<li><a href="#220-235-explain-and-transfer">220-235: explain and transfer</a></li>
+<li><a href="#235-240-exit-check">235-240: exit check</a></li>
+<li><a href="#reference-download-and-local-checks">Reference download and local checks</a></li>
+<li><a href="#sources-and-qualifications">Sources and qualifications</a></li>
+</ul>
+</div>
+</details></nav><article><h1 id="day-1-rebuild-your-python-fundamentals">Day 1: rebuild your Python fundamentals</h1>
+<p>A four-hour, write-it-yourself lesson for a live coding exam. Start with choices, then explain, complete, build, debug and combine. This is Day 1 only, not a take-home defense or a prediction of exam questions.</p>
+<p>Use Python 3.10 or newer, a plain editor and a terminal. No account, API, paid tool or autocomplete is needed. Keep your own attempts before opening a hint or solution. All data below is invented practice data.</p>
+<h2 id="your-240-minute-route">Your 240-minute route</h2>
+<p>Use elapsed time, not wall-clock time. The route includes three five-minute breaks. If you finish a task early, do its stretch prompt and explain your complexity aloud. If stuck for five minutes, write one concrete input/output example, then open one hint. At the time boundary, record what remains and move on. A four-hour practice allocation is not a promise that everyone will finish at the same speed.</p>
+<ul>
+<li><strong>0-25:</strong> ten multiple-choice questions. Spend 15 minutes choosing and explaining, then ten checking mistakes.</li>
+<li><strong>25-55:</strong> rebuild the core ideas with five worked examples. Type and vary each one.</li>
+<li><strong>55-60:</strong> break, away from the screen.</li>
+<li><strong>60-90:</strong> four predict-and-explain traces. Seven minutes each, then two minutes summarizing.</li>
+<li><strong>90-115:</strong> two guided completion tasks. Twelve minutes each, then compare your approach.</li>
+<li><strong>115-120:</strong> break.</li>
+<li><strong>120-155:</strong> two independent scripts. Seventeen minutes each, then record one edge case you missed.</li>
+<li><strong>155-175:</strong> two debugging tasks. Ten minutes each, including a regression test.</li>
+<li><strong>175-180:</strong> break.</li>
+<li><strong>180-220:</strong> capstone event report. Five minutes clarify, five plan, twenty code, ten test and explain.</li>
+<li><strong>220-235:</strong> explain your choices and adapt to a changed constraint. This is short Day 1 recall, not the later mock-defense session.</li>
+<li><strong>235-240:</strong> exit check and one next practice target.</li>
+</ul>
+<p>By the end you will have built four tiny scripts: word counts, grouped scores, recent unique items and a heap-based schedule. The capstone combines those ideas into a report. Write your own first; the reference download is for comparison afterward.</p>
+<h2 id="0-25-choose-then-justify">0-25: choose, then justify</h2>
+<p>For every item, record a letter, a one-sentence reason and confidence from 1 to 3. Each question has one intended answer. Treat dictionary/set costs as expected average costs for ordinary well-behaved hashes; worst cases can be linear. Let n be the number of input items unless stated otherwise.</p>
+<h3 id="q1-copy-or-alias">Q1. Copy or alias?</h3>
+<pre><code class="language-python">a = [1, 2]
+b = a
+b.append(3)
+print(a)
+</code></pre>
+<p>A. <code>[1, 2]</code>  B. <code>[1, 2, 3]</code>  C. <code>None</code>  D. An error</p>
+<details>
+<summary>Check Q1</summary>
+<p><strong>B.</strong> Both names refer to the same list. Assignment did not copy it. A requires a separate list such as <code>a.copy()</code>. C confuses the return value of <code>append</code> with the mutated object. D is not an error because lists support append.</p>
+</details>
+<h3 id="q2-unique-ids-with-repeated-membership-checks">Q2. Unique IDs with repeated membership checks</h3>
+<p>You need to keep distinct string IDs and repeatedly ask whether an ID has been seen. You do not need their order. Which is the best ordinary starting point?</p>
+<p>A. List  B. Set  C. String  D. List sorted again before each lookup</p>
+<details>
+<summary>Check Q2</summary>
+<p><strong>B.</strong> A set represents uniqueness and supports expected O(1) membership. A may scan O(n) items. C can match substrings rather than complete IDs and does not represent a collection of IDs. D adds repeated sorting work without a need for ordering. Hashable strings fit a set; lists as elements would not.</p>
+</details>
+<h3 id="q3-dictionary-membership">Q3. Dictionary membership</h3>
+<pre><code class="language-python">counts = {&quot;pear&quot;: 2, &quot;apple&quot;: 0}
+print(&quot;apple&quot; in counts, 2 in counts)
+</code></pre>
+<p>A. <code>True True</code>  B. <code>False True</code>  C. <code>True False</code>  D. <code>False False</code></p>
+<details>
+<summary>Check Q3</summary>
+<p><strong>C.</strong> <code>in</code> checks keys, including a key whose value is zero. A wrongly searches values for the second check. B and D confuse zero with absence. To inspect values explicitly, use <code>counts.values()</code>, which is a different question and may require a scan.</p>
+</details>
+<h3 id="q4-mutation-and-return-values">Q4. Mutation and return values</h3>
+<pre><code class="language-python">values = [3, 1, 2]
+result = values.sort()
+</code></pre>
+<p>What is <code>result</code>?</p>
+<p>A. <code>[1, 2, 3]</code>  B. <code>[3, 1, 2]</code>  C. <code>None</code>  D. A sorting iterator</p>
+<details>
+<summary>Check Q4</summary>
+<p><strong>C.</strong> <code>list.sort()</code> mutates the list and returns <code>None</code>. A describes the now-sorted list or the return from <code>sorted(values)</code>, not <code>sort()</code>. B is the old order. D is not what this method returns. Use <code>sorted</code> if you need a new list and must preserve the input.</p>
+</details>
+<h3 id="q5-filter-then-transform">Q5. Filter, then transform</h3>
+<pre><code class="language-python">[x * x for x in range(5) if x % 2 == 1]
+</code></pre>
+<p>A. <code>[0, 4, 16]</code>  B. <code>[1, 9]</code>  C. <code>[1, 3]</code>  D. <code>[0, 1, 4, 9, 16]</code></p>
+<details>
+<summary>Check Q5</summary>
+<p><strong>B.</strong> The filter keeps 1 and 3, then the expression squares them. A keeps even inputs. C forgets the transformation. D ignores the filter. The comprehension reads each input once, O(n) time and O(m) output space for m retained items.</p>
+</details>
+<h3 id="q6-frequency-counting">Q6. Frequency counting</h3>
+<pre><code class="language-python">from collections import Counter
+c = Counter(&quot;aba&quot;)
+print(c[&quot;a&quot;], c[&quot;z&quot;])
+</code></pre>
+<p>A. <code>2 0</code>  B. <code>2 KeyError</code>  C. <code>1 0</code>  D. <code>3 0</code></p>
+<details>
+<summary>Check Q6</summary>
+<p><strong>A.</strong> Counter counts repeated elements and returns zero for a missing count. B describes ordinary dictionary indexing, not Counter indexing. C counts distinct letters rather than occurrences. D confuses total length with the count of a single letter. This does not mean a missing key is inserted whenever it is read.</p>
+</details>
+<h3 id="q7-fifo-work-queue">Q7. FIFO work queue</h3>
+<p>Which operation is a good fit for removing the oldest pending item many times?</p>
+<p>A. <code>list.pop(0)</code>  B. <code>deque.popleft()</code>  C. <code>list.sort()</code>  D. <code>set.pop()</code></p>
+<details>
+<summary>Check Q7</summary>
+<p><strong>B.</strong> A deque supports efficient operations at both ends. A shifts the remaining list elements and costs O(n) per front removal. C sorts instead of removing the oldest. D removes an arbitrary set element, not the oldest queued one.</p>
+</details>
+<h3 id="q8-what-is-guaranteed-by-a-min-heap">Q8. What is guaranteed by a min-heap?</h3>
+<p>After <code>heapq.heapify(values)</code> on a nonempty list of integers, which is guaranteed?</p>
+<p>A. The whole list is sorted  B. The largest value is at index 0  C. The smallest value is at index 0  D. Every insertion takes O(n log n)</p>
+<details>
+<summary>Check Q8</summary>
+<p><strong>C.</strong> A min-heap exposes its minimum at the root. The internal array is not fully sorted, so A is too strong. B describes a max-heap. D is not the usual insertion bound; heap push is O(log n). <code>heapify</code> builds a heap in O(n), a useful distinction from sorting.</p>
+</details>
+<h3 id="q9-look-inside-the-loops">Q9. Look inside the loops</h3>
+<pre><code class="language-python">for group in groups:
+    for item in group:
+        print(item)
+</code></pre>
+<p>There are g groups containing n total items. Ignoring output-device latency, what is the traversal cost?</p>
+<p>A. Always O(n squared)  B. O(g + n)  C. O(log n)  D. Always O(1)</p>
+<details>
+<summary>Check Q9</summary>
+<p><strong>B.</strong> Every group is visited, and every contained item is visited once. Nested syntax alone does not prove quadratic work. A would fit two independent loops each visiting n items. C and D do not account for examining every item. If g is at most proportional to n, you can simplify to O(n), but name the assumption.</p>
+</details>
+<h3 id="q10-deterministic-tie-breaking">Q10. Deterministic tie-breaking</h3>
+<p>Sort records by descending score and then ascending name. Which key expresses that rule for integer scores?</p>
+<p>A. <code>key=lambda r: r["score"]</code>  B. <code>key=lambda r: (-r["score"], r["name"])</code>  C. <code>key=lambda r: r["name"], reverse=True</code>  D. <code>key=lambda r: (r["score"], r["name"]), reverse=True</code></p>
+<details>
+<summary>Check Q10</summary>
+<p><strong>B.</strong> Negating only score reverses that component while leaving name ascending. A lacks the requested direction and tie-break. C sorts primarily by name. D reverses both components, making names descending on ties. Stable sorting preserves input order for equal complete keys; it does not invent a missing tie-break.</p>
+</details>
+<p>Score is diagnostic, not a pass/fail label. Mark every low-confidence answer, even if correct. If Q1/Q4 were hard, focus on mutation. If Q2/Q3/Q6 were hard, focus on container contracts. If Q8/Q9/Q10 were hard, slow down on cost and ordering.</p>
+<h2 id="25-55-rebuild-the-ideas">25-55: rebuild the ideas</h2>
+<p>Spend about six minutes on each example. First predict, then type it, change one input and explain why the result changed.</p>
+<h3 id="1-names-mutation-and-strings">1. Names, mutation and strings</h3>
+<pre><code class="language-python">original = [&quot;a&quot;, &quot;b&quot;]
+alias = original
+copy = original.copy()
+alias.append(&quot;c&quot;)
+assert original == [&quot;a&quot;, &quot;b&quot;, &quot;c&quot;]
+assert copy == [&quot;a&quot;, &quot;b&quot;]
+word = &quot;Pear&quot;
+clean = word.casefold()
+assert word == &quot;Pear&quot; and clean == &quot;pear&quot;
+</code></pre>
+<p>List methods can mutate; strings are immutable, so transformations return strings. A shallow list copy still shares nested objects. Try <code>rows = [[1], [2]]; other = rows.copy(); other[0].append(9)</code> and explain both levels of sharing. Don't call a shallow copy an independent deep snapshot.</p>
+<h3 id="2-lists-sets-and-dictionaries-express-different-questions">2. Lists, sets and dictionaries express different questions</h3>
+<pre><code class="language-python">items = [&quot;pear&quot;, &quot;apple&quot;, &quot;pear&quot;]
+assert len(items) == 3
+assert len(set(items)) == 2
+counts = {}
+for item in items:
+    counts[item] = counts.get(item, 0) + 1
+assert counts == {&quot;pear&quot;: 2, &quot;apple&quot;: 1}
+</code></pre>
+<p>A list preserves occurrences and order. A set answers uniqueness/membership, not frequency or a guaranteed sorted order. A dict associates keys with values and preserves insertion order in supported Python versions. Keys and set elements must be hashable. Dictionary value order is not automatically alphabetical order.</p>
+<p>Ordinary expected costs: list indexing O(1), membership O(n), append amortized O(1); dict/set membership expected O(1), worst-case O(n). Explain the difference between amortized append cost and expected hashing cost. Neither means every individual operation takes identical time.</p>
+<h3 id="3-comprehensions-and-stable-sorting">3. Comprehensions and stable sorting</h3>
+<pre><code class="language-python">rows = [(&quot;Zoe&quot;, 4), (&quot;Ana&quot;, 7), (&quot;Bo&quot;, 7)]
+passed = [(name, score) for name, score in rows if score &gt;= 5]
+ranked = sorted(passed, key=lambda row: (-row[1], row[0]))
+assert ranked == [(&quot;Ana&quot;, 7), (&quot;Bo&quot;, 7)]
+assert rows[0] == (&quot;Zoe&quot;, 4)
+</code></pre>
+<p>Filtering is one pass. Sorting m retained items is O(m log m) worst-case; Python's sort can exploit existing order, but use the general bound unless the input contract gives more. The key is computed once per item. Prefer a loop over a comprehension when side effects or multiple state changes make the logic easier to read.</p>
+<h3 id="4-counter-and-defaultdict">4. Counter and defaultdict</h3>
+<pre><code class="language-python">from collections import Counter, defaultdict
+words = [&quot;blue&quot;, &quot;red&quot;, &quot;blue&quot;]
+assert Counter(words)[&quot;blue&quot;] == 2
+by_initial = defaultdict(list)
+for word in words:
+    by_initial[word[0]].append(word)
+assert dict(by_initial) == {&quot;b&quot;: [&quot;blue&quot;, &quot;blue&quot;], &quot;r&quot;: [&quot;red&quot;]}
+</code></pre>
+<p><code>defaultdict(list)</code> creates a fresh list for a missing indexed key. Pass the factory <code>list</code>, not the result <code>list()</code>. Accessing <code>d[missing]</code> can insert a default, whereas <code>d.get(missing)</code> does not invoke the factory. Try both and inspect the keys. Counter's equal-count ordering follows first encounter; use an explicit key when the task requests alphabetical ties.</p>
+<h3 id="5-deque-and-heapq">5. deque and heapq</h3>
+<pre><code class="language-python">from collections import deque
+import heapq
+pending = deque([&quot;first&quot;, &quot;second&quot;])
+pending.append(&quot;third&quot;)
+assert pending.popleft() == &quot;first&quot;
+heap = [8, 2, 5]
+heapq.heapify(heap)
+assert heapq.heappop(heap) == 2
+heapq.heappush(heap, 1)
+assert heapq.heappop(heap) == 1
+</code></pre>
+<p>Use a deque for order at the ends; use a heap for repeated priority selection. A heap is not a substitute for a set. To make equal-priority jobs deterministic, store tuples such as <code>(minute, sequence, label)</code>, where sequence is a unique integer. That avoids comparing arbitrary payload objects when priorities tie.</p>
+<h3 id="cost-recall-before-the-break">Cost recall before the break</h3>
+<p>Without looking up: compare one list search, one set lookup, copying a list, sorting a list, one deque front removal, heapify and k heap pops. Name what n and k mean. For strings, processing an entire string depends on its length; a character-comparison or hash is not always constant when keys themselves grow.</p>
+<h2 id="55-60-break">55-60: break</h2>
+<p>Stand up, look away and leave the answers closed. Do not fill the break with another problem.</p>
+<h2 id="60-90-predict-and-explain">60-90: predict and explain</h2>
+<p>Write the exact result and a brief cost argument before running each trace.</p>
+<h3 id="trace-a-shallow-sharing">Trace A: shallow sharing</h3>
+<pre><code class="language-python">rows = [[1], [2]]
+copy = rows[:]
+copy[0].append(7)
+copy.append([3])
+print(rows, copy)
+</code></pre>
+<details>
+<summary>Trace A answer</summary>
+<p><code>[[1, 7], [2]] [[1, 7], [2], [3]]</code>. The outer copy is separate; its first inner list is shared. Slicing copies the outer references in O(n) time/space for n rows. Appending the extra row only mutates the copied outer list. Change the first append into <code>copy[0] = [7]</code> and predict again: replacing a slot does not mutate the formerly shared inner list.</p>
+</details>
+<h3 id="trace-b-grouping-and-first-occurrence">Trace B: grouping and first occurrence</h3>
+<pre><code class="language-python">from collections import defaultdict
+by_length = defaultdict(list)
+for word in [&quot;tea&quot;, &quot;to&quot;, &quot;ten&quot;, &quot;a&quot;]:
+    by_length[len(word)].append(word)
+print(list(by_length))
+print(by_length[3])
+</code></pre>
+<details>
+<summary>Trace B answer</summary>
+<p><code>[3, 2, 1]</code> and <code>['tea', 'ten']</code>. Keys follow first insertion, not numerical sort. Traversal is expected O(n) excluding total string construction, with O(n) stored word references. Now ask for keys ascending: use <code>sorted(by_length)</code>, which adds O(g log g) work for g distinct lengths.</p>
+</details>
+<h3 id="trace-c-bounded-history">Trace C: bounded history</h3>
+<pre><code class="language-python">from collections import deque
+recent = deque(maxlen=3)
+for item in [&quot;a&quot;, &quot;b&quot;, &quot;c&quot;, &quot;d&quot;]:
+    recent.append(item)
+print(list(recent))
+</code></pre>
+<details>
+<summary>Trace C answer</summary>
+<p><code>['b', 'c', 'd']</code>. A bounded deque drops the opposite end when full. This alone does not enforce uniqueness. Adding a companion set requires removing an evicted item from the set explicitly; automatic eviction does not update a separate set for you. Four appends are constant work each, with space bounded by capacity.</p>
+</details>
+<h3 id="trace-d-priority-and-ties">Trace D: priority and ties</h3>
+<pre><code class="language-python">import heapq
+jobs = [(5, 2, &quot;B&quot;), (3, 1, &quot;A&quot;), (5, 0, &quot;C&quot;)]
+heapq.heapify(jobs)
+print([heapq.heappop(jobs)[2] for _ in range(3)])
+</code></pre>
+<details>
+<summary>Trace D answer</summary>
+<p><code>['A', 'C', 'B']</code>. Tuple order compares minute, then sequence. Building is O(n); taking all n items is O(n log n). For a single fully sorted output, ordinary sorting is often simpler. A heap is useful when new jobs arrive between removals or only a prefix is needed. Change the priority of C to 2 and predict the output before running.</p>
+</details>
+<h2 id="90-115-guided-practice">90-115: guided practice</h2>
+<h3 id="script-1-word-counts">Script 1: word counts</h3>
+<p>Write <code>word_counts(text)</code>. Split on whitespace; case-fold each token; strip only leading/trailing <code>.,!?;:</code>; ignore tokens made empty by stripping. Internal punctuation stays. Return <code>(token, count)</code> pairs sorted by descending count, then token ascending. Do not use Counter for the first attempt. This deliberately small tokenizer is not a general natural-language parser.</p>
+<pre><code class="language-python">def word_counts(text):
+    counts = {}
+    for raw in text.split():
+        token = __________
+        if __________:
+            counts[token] = __________
+    return sorted(counts.items(), key=__________)
+
+assert word_counts(&quot;Tea tea, pear!&quot;) == [(&quot;tea&quot;, 2), (&quot;pear&quot;, 1)]
+assert word_counts(&quot;?!   &quot;) == []
+assert word_counts(&quot;b a&quot;) == [(&quot;a&quot;, 1), (&quot;b&quot;, 1)]
+</code></pre>
+<details>
+<summary>Script 1 hint</summary>
+<p>Use <code>raw.casefold().strip(".,!?;:")</code>, then test the string's truth value. Count with <code>.get(token, 0) + 1</code>. Sort pairs with <code>lambda pair: (-pair[1], pair[0])</code>. State your tie-break before writing the key.</p>
+</details>
+<details>
+<summary>Script 1 reference and explanation</summary>
+<pre><code class="language-python">def word_counts(text):
+    counts = {}
+    for raw in text.split():
+        token = raw.casefold().strip(&quot;.,!?;:&quot;)
+        if token:
+            counts[token] = counts.get(token, 0) + 1
+    return sorted(counts.items(), key=lambda pair: (-pair[1], pair[0]))
+</code></pre>
+<p>Let L be total text length and u distinct normalized tokens. Expected counting work is O(L); sorting is O(u log u) key comparisons, with string comparisons depending on token lengths. <code>split</code> and token storage allocate memory proportional to input/token content. Rewrite with Counter after the first solution. Why is <code>dict(Counter(...))</code> not a ranked output?</p>
+</details>
+<h3 id="script-2-grouped-scores">Script 2: grouped scores</h3>
+<p>Write <code>group_scores(rows)</code>. Input is a list of <code>(name, integer_score)</code> tuples. Group by the first case-folded character of each nonempty name, preserving each original name. Ignore empty names only, not whitespace names. Return a plain dict whose keys are inserted ascending, with each group's rows sorted by descending score, then original name ascending. Do not mutate input.</p>
+<pre><code class="language-python">from collections import defaultdict
+
+def group_scores(rows):
+    grouped = defaultdict(list)
+    for name, score in rows:
+        if __________:
+            grouped[__________].append((name, score))
+    return {
+        initial: sorted(__________, key=__________)
+        for initial in __________
+    }
+</code></pre>
+<p>Acceptance examples: <code>[('Ana', 7), ('Ali', 9), ('Bo', 8), ('', 99)]</code> yields <code>{'a': [('Ali', 9), ('Ana', 7)], 'b': [('Bo', 8)]}</code>; empty input yields <code>{}</code>; equal scores sort names ascending. Assume names contain ordinary single-code-point initials for this exercise; case folding some Unicode characters expands them, so a real internationalized grouping rule needs a separate decision.</p>
+<details>
+<summary>Script 2 hint</summary>
+<p>Use <code>if name</code>, <code>name[0].casefold()</code>, <code>grouped[initial]</code>, and <code>sorted(grouped)</code> for the keys. <code>defaultdict(list)</code> avoids a shared mutable default list. Do not accidentally sort names case-insensitively when the requested tie-break is original-name order.</p>
+</details>
+<details>
+<summary>Script 2 reference and explanation</summary>
+<pre><code class="language-python">from collections import defaultdict
+
+def group_scores(rows):
+    grouped = defaultdict(list)
+    for name, score in rows:
+        if name:
+            grouped[name[0].casefold()].append((name, score))
+    return {
+        initial: sorted(grouped[initial], key=lambda row: (-row[1], row[0]))
+        for initial in sorted(grouped)
+    }
+</code></pre>
+<p>Expected grouping is O(n), followed by sorting g keys and each group. A safe overall comparison bound is O(n log n + g log g); if g &lt;= n this is O(n log n), ignoring string-comparison length. Output space is O(n). Explain why building each group's list by repeatedly concatenating a longer list would do unnecessary copying.</p>
+</details>
+<h2 id="115-120-break">115-120: break</h2>
+<p>Save your scripts. On return, use a blank file for the next task.</p>
+<h2 id="120-155-independent-practice">120-155: independent practice</h2>
+<h3 id="script-3-recent-unique-items">Script 3: recent unique items</h3>
+<p>Implement <code>recent_unique(items, capacity)</code>. Items are strings in arrival order. Keep at most capacity distinct items, oldest first. Ignore a duplicate while it remains in the retained window; <strong>do not refresh its position</strong>. Once evicted, an item may be added again. Capacity zero returns <code>[]</code>; a negative capacity raises ValueError. Assume integer capacity and string items. Use a deque and set together, not repeated list membership.</p>
+<p>Acceptance checks:</p>
+<pre><code class="language-python">assert recent_unique([&quot;a&quot;, &quot;b&quot;, &quot;a&quot;, &quot;c&quot;, &quot;a&quot;], 2) == [&quot;c&quot;, &quot;a&quot;]
+assert recent_unique([&quot;a&quot;, &quot;b&quot;, &quot;a&quot;], 2) == [&quot;a&quot;, &quot;b&quot;]
+assert recent_unique([], 3) == []
+assert recent_unique([&quot;x&quot;], 0) == []
+assert recent_unique([&quot;a&quot;, &quot;b&quot;, &quot;a&quot;], 1) == [&quot;a&quot;]
+</code></pre>
+<p>Before coding, hand-trace queue and set after every input of the first example. Invariant: the set equals exactly the elements in the deque, with no duplicates and length at most capacity. Add a test showing that an evicted item can return. Stretch: what changes if duplicates should refresh recency? Do not silently implement that different contract.</p>
+<details>
+<summary>Script 3 hint</summary>
+<p>Skip retained duplicates before evicting. When full, <code>popleft</code> and remove that exact value from the set. Then append/add the new item. Handle capacity zero before trying to pop from an empty queue.</p>
+</details>
+<details>
+<summary>Script 3 reference and explanation</summary>
+<pre><code class="language-python">from collections import deque
+
+def recent_unique(items, capacity):
+    if capacity &lt; 0:
+        raise ValueError(&quot;capacity must be nonnegative&quot;)
+    if capacity == 0:
+        return []
+    queue = deque()
+    seen = set()
+    for item in items:
+        if item in seen:
+            continue
+        if len(queue) == capacity:
+            seen.remove(queue.popleft())
+        queue.append(item)
+        seen.add(item)
+    return list(queue)
+</code></pre>
+<p>Expected O(n) work, O(min(n, capacity)) retained state, with string hashing costs as a qualification. No full input history is retained. Using <code>deque(maxlen=capacity)</code> without synchronizing the set produces false duplicate detection after eviction. Explain why using <code>remove</code> rather than <code>discard</code> can help expose a broken invariant during development.</p>
+</details>
+<h3 id="script-4-take-the-next-jobs">Script 4: take the next jobs</h3>
+<p>Implement <code>next_jobs(jobs, k)</code>. Each job is <code>(minute, label)</code>; minutes are integers and labels strings. Return at most k labels ordered by ascending minute, preserving input order on equal minutes. Do not mutate input. k zero returns <code>[]</code>; negative k raises ValueError. Assume integer k. Use a min-heap and a unique sequence number, even though sorting would be a simpler valid general alternative.</p>
+<p>Acceptance checks:</p>
+<pre><code class="language-python">jobs = [(5, &quot;B&quot;), (3, &quot;A&quot;), (5, &quot;C&quot;)]
+assert next_jobs(jobs, 2) == [&quot;A&quot;, &quot;B&quot;]
+assert next_jobs(jobs, 20) == [&quot;A&quot;, &quot;B&quot;, &quot;C&quot;]
+assert next_jobs([], 2) == []
+assert next_jobs(jobs, 0) == []
+assert jobs == [(5, &quot;B&quot;), (3, &quot;A&quot;), (5, &quot;C&quot;)]
+</code></pre>
+<p>Budget your seventeen minutes: three clarify/trace, eight implement, four tests, two complexity. Stretch: explain when you would keep a heap alive between calls instead of rebuilding it, and why a heap copied from input still uses O(n) space even if k is small.</p>
+<details>
+<summary>Script 4 hint</summary>
+<p>Construct <code>(minute, sequence, label)</code> using <code>enumerate(jobs)</code>. Build once with heapify, then pop <code>min(k, len(heap))</code> times. Sequence, not label, breaks ties.</p>
+</details>
+<details>
+<summary>Script 4 reference and explanation</summary>
+<pre><code class="language-python">import heapq
+
+def next_jobs(jobs, k):
+    if k &lt; 0:
+        raise ValueError(&quot;k must be nonnegative&quot;)
+    heap = [(minute, seq, label)
+            for seq, (minute, label) in enumerate(jobs)]
+    heapq.heapify(heap)
+    take = min(k, len(heap))
+    return [heapq.heappop(heap)[2] for _ in range(take)]
+</code></pre>
+<p>O(n + min(k,n) log n) time and O(n) heap space. The zero case here still builds the heap; you could return early for k zero. Do not claim O(k) memory for this implementation. <code>sorted</code> has O(n log n) general time and is worth considering if you always need the full order.</p>
+</details>
+<h2 id="155-175-debug-and-protect-the-fix">155-175: debug and protect the fix</h2>
+<h3 id="bug-a-disappearing-order-and-unstable-ties">Bug A: disappearing order and unstable ties</h3>
+<p>The requested output is descending frequency, then token ascending. The input is already normalized tokens.</p>
+<pre><code class="language-python">from collections import Counter
+
+def rank_tokens(tokens):
+    counts = Counter(set(tokens))
+    return counts.most_common()
+</code></pre>
+<p>Find two separate problems. Write a failing assertion for each, then fix the function. Test both before opening the answer. Do not change the requested contract to match Counter's default ties.</p>
+<details>
+<summary>Bug A answer</summary>
+<p><code>set</code> destroys multiplicity. <code>most_common</code> ties follow first encounter, not alphabetical order, and set iteration does not provide the requested deterministic tie order. Use:</p>
+<pre><code class="language-python">def rank_tokens(tokens):
+    counts = Counter(tokens)
+    return sorted(counts.items(), key=lambda p: (-p[1], p[0]))
+
+assert rank_tokens([&quot;b&quot;, &quot;b&quot;, &quot;a&quot;]) == [(&quot;b&quot;, 2), (&quot;a&quot;, 1)]
+assert rank_tokens([&quot;b&quot;, &quot;a&quot;]) == [(&quot;a&quot;, 1), (&quot;b&quot;, 1)]
+</code></pre>
+<p>The first assertion exposes lost counts. The second exposes the specified tie rule; on some set orders the broken code may accidentally pass that one, so do not describe a single lucky execution as proof. The fixed implementation is deterministic for this contract.</p>
+</details>
+<h3 id="bug-b-stale-history-membership">Bug B: stale history membership</h3>
+<pre><code class="language-python">from collections import deque
+
+def broken_recent(items, capacity):
+    queue = deque(maxlen=capacity)
+    seen = set()
+    for item in items:
+        if item not in seen:
+            queue.append(item)
+            seen.add(item)
+    return list(queue)
+</code></pre>
+<p>Reproduce the error for <code>["a", "b", "c", "a"]</code> with capacity 2. Name the invariant it breaks. Add a capacity-zero test and a negative-capacity test to your corrected Script 3. Fix the root cause rather than periodically clearing all history.</p>
+<details>
+<summary>Bug B answer</summary>
+<p>Correct result: <code>['c', 'a']</code>; broken result: <code>['b', 'c']</code>. The queue evicts <code>a</code>, but seen still contains it. A later <code>a</code> is falsely rejected. Explicit eviction from both structures, as in Script 3, restores their equality. Reject negative capacity explicitly. Capacity zero returns empty without attempting a queue removal. A full reset would discard valid retained items and alter the contract.</p>
+</details>
+<h2 id="175-180-break">175-180: break</h2>
+<p>Close the reference solutions. The next task uses the same ideas without giving the implementation order.</p>
+<h2 id="180-220-capstone-event-report">180-220: capstone event report</h2>
+<p>Build <code>event_report(events, capacity, k)</code>. Each event is a dict with exactly the useful fields <code>name</code> (nonempty string), <code>minute</code> (integer), and <code>tags</code> (list of strings). Extra fields, if present, are ignored. For this exercise inputs are already valid; validation is an extension, not hidden required work. Do not mutate events or their tags. No files, networking, personal data or external libraries.</p>
+<p>Return a dict with:</p>
+<ul>
+<li><code>tag_counts</code>: <code>(tag, count)</code> pairs, count descending then tag ascending. Normalize each tag with casefold and whitespace strip only; skip empty normalized tags. Count every occurrence, including repeated tags inside one event.</li>
+<li><code>recent_names</code>: use Script 3's contract on event names in input order, with capacity. Names are case-sensitive and not normalized.</li>
+<li><code>next_names</code>: use Script 4's contract on <code>(minute, name)</code> pairs, with k. This includes every event occurrence, even repeated names. Input order breaks equal-minute ties.</li>
+</ul>
+<p>Negative capacity or k raises ValueError, including on empty input. Do not quietly return an empty report when a parameter is invalid.</p>
+<p>Example:</p>
+<pre><code class="language-python">events = [
+    {&quot;name&quot;: &quot;B&quot;, &quot;minute&quot;: 5, &quot;tags&quot;: [&quot; Py &quot;, &quot;data&quot;]},
+    {&quot;name&quot;: &quot;A&quot;, &quot;minute&quot;: 3, &quot;tags&quot;: [&quot;py&quot;, &quot;&quot;]},
+    {&quot;name&quot;: &quot;B&quot;, &quot;minute&quot;: 5, &quot;tags&quot;: [&quot;data&quot;, &quot;data&quot;]},
+    {&quot;name&quot;: &quot;C&quot;, &quot;minute&quot;: 5, &quot;tags&quot;: []},
+]
+expected = {
+    &quot;tag_counts&quot;: [(&quot;data&quot;, 3), (&quot;py&quot;, 2)],
+    &quot;recent_names&quot;: [&quot;A&quot;, &quot;C&quot;],
+    &quot;next_names&quot;: [&quot;A&quot;, &quot;B&quot;, &quot;B&quot;],
+}
+assert event_report(events, 2, 3) == expected
+</code></pre>
+<p>The time allocation:</p>
+<ol>
+<li><strong>Five minutes clarify:</strong> explain duplicate tags versus duplicate names, sorting ties, mutation and parameter errors. Write one empty-input expectation.</li>
+<li><strong>Five minutes plan:</strong> sketch which container answers which question. State what each helper promises. Trace the sample by hand.</li>
+<li><strong>Twenty minutes build:</strong> first get the sample working, then edge cases. Prefer readable helpers over one long comprehension.</li>
+<li><strong>Ten minutes test/explain:</strong> empty events; capacity/k zero; all tags blank; tied minutes; repeated names after eviction; negative parameters; unchanged input. Explain a brute-force alternative and its cost without pretending you implemented an optimization you did not.</li>
+</ol>
+<details>
+<summary>Capstone hint 1: composition</summary>
+<p>Reuse the helpers' contracts. Counting tags is a Counter or dict task. Recent distinct names need deque plus set. Priority output uses heap tuples with sequence numbers. The distinction between event occurrences and unique retained names is intentional.</p>
+</details>
+<details>
+<summary>Capstone hint 2: parameter errors</summary>
+<p>Validate both negative parameters before doing useful work, even if events is empty. Collect tags independently from names so a repeated name does not erase a valid tag occurrence.</p>
+</details>
+<details>
+<summary>Capstone reference solution</summary>
+<pre><code class="language-python">from collections import Counter
+
+def event_report(events, capacity, k):
+    if capacity &lt; 0 or k &lt; 0:
+        raise ValueError(&quot;capacity and k must be nonnegative&quot;)
+    counts = Counter()
+    for event in events:
+        for raw in event[&quot;tags&quot;]:
+            tag = raw.casefold().strip()
+            if tag:
+                counts[tag] += 1
+    return {
+        &quot;tag_counts&quot;: sorted(counts.items(), key=lambda p: (-p[1], p[0])),
+        &quot;recent_names&quot;: recent_unique(
+            (event[&quot;name&quot;] for event in events), capacity
+        ),
+        &quot;next_names&quot;: next_jobs(
+            [(event[&quot;minute&quot;], event[&quot;name&quot;]) for event in events], k
+        ),
+    }
+</code></pre>
+<p>Let e be event count, L total tag characters, u distinct normalized tags and t=min(k,e). Expected time is O(L + e + u log u + t log e), with string comparisons/hashing as qualifications; for e zero, the heap work is zero. Space includes O(e) heap/job references, O(min(e,capacity)) retained history and normalized tag/output storage. This implementation expects events to be a repeatable list, not a one-shot iterator. If you change that contract, account for multiple traversals or refactor into one pass.</p>
+</details>
+<h3 id="review-rubric-10-points">Review rubric, 10 points</h3>
+<ul>
+<li>Two points: counts every normalized tag occurrence and handles alphabetical ties.</li>
+<li>Two points: exact recent-window semantics, synchronized deque/set, zero and invalid capacities.</li>
+<li>Two points: priority order with stable input-order ties and correct k limits.</li>
+<li>Two points: unchanged input and tests covering edge cases rather than only the sample.</li>
+<li>Two points: explains variables, time/space and one honest alternative.</li>
+</ul>
+<p>Eight points suggests a useful baseline, not an exam guarantee. If tests fail, preserve the failing case and root cause rather than replacing the expected output. Optional stretch: validate malformed events with a clear policy. Keep that extension separate so it does not hide a broken core implementation.</p>
+<h2 id="220-235-explain-and-transfer">220-235: explain and transfer</h2>
+<p>Use three minutes per prompt. Answer before opening the reference guide.</p>
+<ol>
+<li>Why do counts, uniqueness, FIFO order and priority order need different containers? Give one case where using a set loses required information.</li>
+<li>Your partner says any nested loop is quadratic. Use grouping and the tag traversal to show why the amount visited matters more than indentation.</li>
+<li>The priority list must now accept new jobs while you remove old ones. What state would you retain? What identity would you use for cancellation? Do not claim the current helper supports cancellation.</li>
+<li>A caller passes a generator of events instead of a list. Which part of the capstone contract breaks? Compare materializing once with a one-pass rewrite, including memory.</li>
+<li>You have two minutes to improve your own solution. Name an actual issue you saw, the smallest change and the test that would show it helped. Saying you need to check a library detail is better than bluffing.</li>
+</ol>
+<details>
+<summary>Explanation guide</summary>
+<ol>
+<li>Dict/Counter preserve counts; a set only preserves membership; deque preserves endpoint order; heap exposes priority. A set of tags discards repeated occurrences.</li>
+<li>Traversing g groups and n contained items is O(g+n); scanning every pair of n items is O(n squared). Include the work in the loop body.</li>
+<li>Keep the heap and monotonic sequence counter between operations. Cancellation might need job IDs and lazy-deletion bookkeeping or another structure; stale entries and compaction add design work.</li>
+<li>Multiple passes exhaust a one-shot iterator. Materializing once costs O(e) extra references; a one-pass rewrite can collect counts/history/heap as it goes but still stores heap entries. Streaming cannot make a full retained heap free.</li>
+<li>A good answer names a demonstrated failure or limitation, not a vague rewrite. Examples: early return for k zero, a missed tie test, or a documented input type. Preserve behavior unless the requirement changed.</li>
+</ol>
+</details>
+<h2 id="235-240-exit-check">235-240: exit check</h2>
+<p>Close every reveal. Without looking back:</p>
+<ul>
+<li>Rewrite the ranking key for count descending and word ascending.</li>
+<li>State the difference between <code>sorted(x)</code> and <code>x.sort()</code>.</li>
+<li>State the deque/set invariant in Script 3.</li>
+<li>Explain why the heap tuple contains a sequence number.</li>
+<li>Name one case your first code got wrong and the test that now protects it.</li>
+</ul>
+<p>Write: "Next practice target: <strong><em>, because my evidence was </em></strong>." Choose one target, not an entire new plan. Keep the four scripts and capstone with your attempts, tests and corrections. Do not move to speed practice until you can explain the basic contracts.</p>
+<h2 id="reference-download-and-local-checks">Reference download and local checks</h2>
+<p>After attempting the work, download <a href="python-day1-reference.py">reference solutions</a> and <a href="python-day1-test.py">standard-library tests</a>. Put them in one empty folder, then run:</p>
+<pre><code class="language-sh">python python-day1-reference.py
+python python-day1-test.py
+</code></pre>
+<p>The reference file runs sample assertions without third-party packages. The test file exercises all four scripts, both debugging fixes and the capstone. These tests check the stated practice contracts, not every possible Python input type. Passing them does not substitute for explaining your code.</p>
+<h2 id="sources-and-qualifications">Sources and qualifications</h2>
+<p>Python semantics and library behavior checked against these references on 19 November 2026. The lesson deliberately uses long-established Python 3.10+ features rather than newer-version-only APIs. Expected/amortized/worst-case cost distinctions matter; implementation and input details can change real performance.</p>
+<ul>
+<li><a href="https://docs.python.org/3/tutorial/datastructures.html">Python tutorial: data structures</a>, lists, comprehensions, dictionaries, sets and queues.</li>
+<li><a href="https://docs.python.org/3/library/collections.html">collections</a>, Counter, defaultdict and deque behavior, including tie order and missing counts.</li>
+<li><a href="https://docs.python.org/3/library/heapq.html">heapq</a>, min-heap invariant, heapify and priority-queue tie-break patterns.</li>
+<li><a href="https://wiki.python.org/moin/TimeComplexity">Python time complexity reference</a>, CPython operation bounds and expected hash-table qualifications.</li>
+</ul>
+<p>All scenarios, names, code and tests are original practice material. No private recruiting correspondence, take-home source or personal claims are used.</p></article></main><footer>Practice material. Examples are hypothetical unless explicitly labelled otherwise. No private recruiting details or project artifacts are included.</footer></body></html>
