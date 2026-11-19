@@ -13,7 +13,7 @@ CSS = '''
 for src in sorted((ROOT/'public/lessons').glob('*.md')):
     text = src.read_text()
     title = text.splitlines()[0].removeprefix('# ')
-    md = markdown.Markdown(extensions=['fenced_code','tables','toc'], extension_configs={'toc':{'toc_depth':'2-2'}})
+    md = markdown.Markdown(extensions=['fenced_code','tables','toc','md_in_html'], extension_configs={'toc':{'toc_depth':'2-2'}})
     body = md.convert(text)
     page = f'''<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="description" content="Public-safe interview practice: discovery, cloud systems, prototypes, documents and evidence."><title>{html.escape(title)} | Interview graph</title><style>{CSS}</style></head><body><header><strong>INTERVIEW GRAPH / STUDY</strong><a href="../">Back to graph</a><a class="download" href="{src.stem}.md" download>Download Markdown</a><button type="button" onclick="window.print()">Print</button></header><main><nav aria-label="On this page"><details><summary>On this page</summary>{md.toc}</details></nav><article>{body}</article></main><footer>Practice material. Examples are hypothetical unless explicitly labelled otherwise. No private recruiting details or project artifacts are included.</footer></body></html>'''
     (ROOT/'public/lessons'/f'{src.stem}.html').write_text(page + '\n')

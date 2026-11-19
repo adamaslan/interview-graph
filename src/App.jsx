@@ -49,6 +49,8 @@ export default function App() {
         <h1 className="mr-2 text-base font-semibold">Interview graph</h1>
         <a href="./lessons/solutions-cram.html" className="text-xs underline" style={{ color: 'var(--fam-infra)' }}>Solutions cram · 1h</a>
 
+        <a href="./lessons/python-day1.html" className="text-xs underline" style={{ color: 'var(--fam-infra)' }}>Python Day 1 · 4h</a>
+
         <nav className="flex flex-wrap gap-1" aria-label="Layers">
           {LAYERS.map(l => (
             <button key={l.id} className={`ctl ${layer === l.id ? 'active' : ''}`}
