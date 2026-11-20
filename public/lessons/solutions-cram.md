@@ -217,19 +217,43 @@ Terraform validation does not prove a configuration matches a live estate, can a
 
 ## 15-25: Connect Figma and rich interactive HTML
 
-### Figma: make a decision before writing the whole application
+### Figma: create the experience, then test the recovery path
 
-Use a prototype to test the workflow, not to prove the backend works. Show the starting point, the main action, the result and the recovery path. Ask a representative user to complete a task without coaching.
+Figma Design is a visual design tool. You create frames for screens, add text and shapes, arrange them with layout rules, and reuse components for repeated controls. In the Prototype tab, connect a button or other hotspot to a destination frame or overlay and define its interaction. Present that flow so someone can click through it. Those connected states create the experience you are testing; they do not create the production database, permission checks or recovery worker.
 
-A useful hypothetical flow is a solution brief review:
+**How I would build it:** Start with five frames: request, evidence, draft, changes requested, and approved. Give the draft a visible status and version. Make one reusable evidence card and button component; use auto layout to keep spacing consistent when the title or evidence gets longer. Connect "Review draft" to the draft frame, "Request changes" to an overlay with a reason, and "Return to draft" back to the preserved draft. Add a second branch for missing evidence and a third for an approval failure. Preview at desktop and phone sizes, then watch someone attempt the task without coaching.
 
-1. Choose an approved request.
-2. Inspect source evidence and missing fields.
-3. Review a generated draft with uncertainty visible.
-4. Edit or reject it.
-5. Approve the final version for its intended audience.
+Here, **recovery path means what the person can do after something goes wrong**. It is not Figma restoring a cloud service or proving an API retry works. The prototype makes the fallback understandable before engineering builds the real state machine. Show the failure, what work is safe, the available action and what happens next. A toast saying "Something went wrong" is not a recovery path.
 
-Ask: Where did the user hesitate? Did they understand draft versus approved? Could they recover from missing information? Bring those observations back into the design.
+### Strong hypothetical example: review a solution brief
+
+**Scenario:** A solutions engineer needs a brief for a retail operations team asking whether to pilot an AI support assistant. A discovery note says responses must cite approved policy. The data-retention requirement is missing. The reviewer must catch that gap before the brief can go to the customer. All company details and outcomes in this example are hypothetical.
+
+1. **Request:** Open "Retail support pilot" with the customer audience, reviewer and success measure. The measure is whether the reviewer can find the missing requirement and choose a safe next action, not whether they like the colors.
+2. **Evidence:** Show the discovery-note excerpt beside its source/date. Show "Retention policy: missing" as a gap, not a guessed requirement. Selecting the source opens an evidence panel without losing the current task.
+3. **Draft:** Show the suggested pilot plan and an explicit "Draft, not approved" badge. Put unsupported assumptions next to the relevant claim. The reviewer can edit the plan or return it with a specific question.
+4. **Recover from missing information:** Selecting "Request retention requirement" preserves the current draft and opens a question addressed to the request owner. The next state is "Waiting for evidence", not "Approved". When the requirement arrives, show what changed and require review of the new version.
+5. **Recover from an interrupted approval:** If the approval response is unknown, keep the draft and say "Approval status not confirmed". Offer "Check status", not another blind approval. The production design must check the saved version and use an idempotent approval action so a retry cannot duplicate delivery. Figma only simulates these states.
+6. **Finish deliberately:** On a confirmed success frame, show the approved version, reviewer and intended audience. Approval and sending are separate decisions. Provide "View approved brief" and a return route; do not silently send it.
+
+**Prototype test:** Ask a reviewer, "Get this brief ready for the customer without inventing the missing retention policy." Do they spot the gap, preserve their edits, request the right information and distinguish approved from sent? Then simulate a lost approval response. Can they check status without starting over or sending twice? Record hesitation, wrong turns, recovery success and any coaching needed. These are proposed measures, not results from a study already run.
+
+**Engineering handoff:** For each frame, record the entry condition, allowed action, persisted state, API outcome and acceptance test. For example: "Given the server saved approval but the response was lost, checking status must show that same approved version without creating a second approval or sending the brief." Design review decides whether the path makes sense; an integration test proves it works.
+
+<details markdown="1">
+<summary>Rehearse: why use Figma instead of immediately building the page?</summary>
+
+"I can test a risky workflow cheaply before connecting live systems. In this brief-review example, I would test whether the reviewer notices missing evidence and can recover from an uncertain approval without losing work. Figma lets us click through those states and improve the wording and layout. It does not prove persistence or duplicate prevention. I would turn the agreed states into an HTML prototype and then implementation tests against the real API."
+
+</details>
+
+### Proposed NWF idea: a signal-review card with an honest fallback
+
+**Proposal only, not a shipped NWF feature or a trading recommendation:** Prototype a watchlist signal card that separates market evidence, a model explanation and the person's decision. Show a dated price/signal snapshot, its source, the explanation's generation time and an obvious freshness label. Let the person open "Why this signal?" and inspect the evidence rather than treating a generated sentence as proof.
+
+The recovery branch is the point of the experiment. If a refresh fails, preserve the watchlist and show the last known result with its age and "Refresh failed". If it is too old for the chosen policy, withhold the current-signal claim and offer a retry or the underlying dated evidence. Do not turn stale data into a fresh buy/sell recommendation. If an explanation is unavailable, keep the verified numeric evidence visible with a clear explanation gap instead of inventing a reason.
+
+Create Figma variants for fresh, refreshing, stale, unavailable and recovered. Test whether someone can identify the age of the evidence and choose a sensible next step without confusing "cached" with "current". An HTML prototype can later simulate those states with visibly labelled fixture data. A real implementation would still need source/session validation, cache-age rules, bounded retries and consumer tests. This connects design recovery to actual cache and backend behavior without pretending the prototype supplies either.
 
 ### Rich HTML, sometimes called "deluxe HTML"
 
@@ -364,6 +388,9 @@ These references support concepts, not claims about an employer or any private p
 
 - [Claude Agent Skills overview](https://docs.anthropic.com/en/docs/agents-and-tools/agent-skills/overview)
 - [Figma guide to prototyping](https://help.figma.com/hc/en-us/articles/360040314193-Guide-to-prototyping-in-Figma)
+- [Frames in Figma Design](https://help.figma.com/hc/en-us/articles/360041539473-Frames-in-Figma-Design)
+- [Interactive button components](https://help.figma.com/hc/en-us/articles/39712951432343-Design-an-interactive-button-component)
+- [Auto layout in designs](https://help.figma.com/hc/en-us/articles/5731482952599-Toggle-on-auto-layout-in-designs)
 - [W3C page structure tutorial](https://www.w3.org/WAI/tutorials/page-structure/)
 
 Use the existing graph's Estate, Depth, AWS map, GHA and 66degrees layers for related technical and stakeholder practice. Product limits and prices change; check current official documentation before making a real deployment decision.
