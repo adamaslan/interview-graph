@@ -55,6 +55,138 @@ Use the graph's Estate and Depth layers to rehearse a generic frontend â†’ API â
 
 Cloud Run is one option for a container-based HTTP service or batch workload. Do not turn that into an assertion that every service, job or event-driven workload has the same execution model. Be ready to explain why the chosen product fits the workload.
 
+#### Walk the existing graph, then explain the boundary
+
+Keep **Estate** open for the components and their connections. Switch to **Depth** for the reasons behind them: identity, retries, caching and failure handling. Use the graph's service, datastore and scheduler nodes as prompts, not proof that a particular deployment works this way today.
+
+**One hypothetical example throughout:** an internal request tracker. A signed-in teammate opens a request, edits its summary and later sees a daily status digest. These are design examples, not claims about a real company or a shipped system.
+
+```text
+Browser -> API -> durable request records
+              -> optional cache for permitted reads
+Scheduler -> worker -> durable digest/run records
+Request IDs and run IDs connect the evidence across both paths.
+```
+
+The scheduler is a separate background path, not an extra hop that every browser request must wait for. Observability spans both paths.
+
+#### 1. Browser: make the task and its state understandable
+
+**Boundary:** the browser is the person's interface, not a trusted authority. It collects input, sends a request and translates the result into a useful next step. Anyone can change client-side code or send an HTTP request without using the page.
+
+**Example:** when the teammate opens request `R-42`, show loading while fetching it. A successful list response with no records is **empty**. A permission refusal is **denied**, not an empty list. A network failure or server failure is an **error**, not proof that no request exists. After saving, show the server-confirmed record, not an optimistic success that silently survives a failed write. Offer a safe retry without losing the draft.
+
+**Say it:** "The frontend helps the user do the task and recover from failure. Hiding an Edit button improves the experience, but the server must still enforce who can edit."
+
+**Follow-up:** "What if Save times out?" The write may have committed even though the response was lost. Reconcile with the server using a stable operation ID before blindly submitting it again.
+
+#### 2. API: validate, authenticate, then authorize the action
+
+**Boundary:** untrusted input becomes a controlled operation. **Validation** asks whether the request has an allowed shape and values. **Authentication** asks who the caller is. **Authorization** asks whether that caller may perform this action on this record, in this organization, now. Passing one check does not pass the others.
+
+**Example:** for an edit to `R-42`, reject an oversized summary or unexpected fields, verify the session or token, then check the caller's edit permission and organization membership. Derive trusted ownership from verified identity and stored records, not a browser-supplied `isAdmin` flag. Use safe database parameters and prevent overwriting a newer edit with an old version.
+
+**Say it:** "A valid token proves identity only after verification. It does not mean its holder can read or change every record. I authorize the specific action and object on the server."
+
+**Follow-up:** "What if someone changes the URL to another request ID?" Re-run the object-level permission check. A hard-to-guess identifier is not authorization. Return a safe denial response without leaking another team's record.
+
+#### 3. Service identity: separate the caller from the backend's powers
+
+**Boundary:** the backend's runtime identity controls what it can access in downstream systems. It is different from the teammate's identity and from the account that deployed the application. A trusted backend still needs an application-level decision about whose record it is handling.
+
+**Example:** a Cloud Run API can run as a dedicated service account. Give it only the datastore operations its work requires, scoped as narrowly as supported. A separate digest worker may need to read eligible requests and write digest results, without the ability to administer the project or change access policies. Use platform-provided credentials where supported rather than putting a long-lived service-account key in frontend code.
+
+**Say it:** "First I check whether this person may edit R-42. Then the service performs the permitted database operation using its own limited runtime identity. Backend access must not become a way for a user to borrow all of the service's powers."
+
+**Follow-up:** "Why not use Owner so it works?" Excess permissions increase the damage from a bug or compromise. Name the required operations, test allowed and denied cases, and keep deployment permissions separate.
+
+#### 4. Datastore and cache: decide which answer is authoritative
+
+**Boundary:** durable storage records accepted state. A cache holds a reusable copy that may be stale, missing or evicted. The role comes from the design, not the product name: a database product can store either authoritative records or cached results.
+
+**Example:** request records and their versions live in the durable datastore. A permitted request-list response may be cached briefly. After an edit, invalidate or update affected cached views, or explicitly tolerate and label a short stale period. Key any user-specific cache by the relevant authorization scope; never return one team's private response to another team. A cache miss means fetch from the source, not "the request was deleted."
+
+**Say it:** "I choose the source of truth first. Then I define what may be stale, for how long, and what happens when the cache is unavailable. A fast wrong answer is still wrong."
+
+**Follow-up:** "How do you avoid lost edits?" Use a transaction or version precondition appropriate to the datastore. If the expected version changed, return a conflict and let the user reconcile, rather than silently replacing newer work. Durability also needs a backup and recovery plan; it is not a promise that data can never be lost.
+
+#### 5. Scheduler and jobs: make repetition safe and completion visible
+
+**Boundary:** a trigger starts work; it does not prove the work finished. A schedule is not an exactly-once guarantee. Separate trigger delivery, worker execution and the useful business result.
+
+**Example:** the daily digest uses a stable key for the organization and scheduled period. A durable uniqueness check or transactional claim prevents two workers from publishing two digests for that key. Re-running safely returns or resumes the existing result. A check in process memory is not enough across restarts. If an external send is involved, use its supported deduplication mechanism or a durable outbox/reconciliation design; a database flag alone cannot make two separate systems atomic.
+
+Set a maximum attempt count, backoff and an overall deadline that includes child work. Retry transient failures, not permanent permission errors forever. Record attempts and a final state such as succeeded, failed or partial, with counts and a reason. A trigger acknowledgement or green process exit is not enough if no useful digest was produced.
+
+**Say it:** "I assume a trigger can repeat. The job must be safe to repeat, stop within a budget and leave a durable result someone can inspect."
+
+**Follow-up:** "What if it crashes halfway?" Resume from a durable checkpoint or repeat idempotent steps. Make partial work explicit and prevent overlapping runs from fighting over the same output.
+
+#### 6. Logs and metrics: connect the user's symptom to evidence
+
+**Boundary:** diagnostics must explain what happened without becoming a second store of private data. Logs describe individual events; metrics summarize rates, latency and freshness. A trace can connect timed operations across services.
+
+**Example:** the page displays a safe support reference after an edit fails. The API records a server-controlled request ID, operation, safe error code and duration. A digest has its own run ID, linked to the initiating request when one exists. Record whether zero output was expected, not merely that the worker exited. Monitor failed tasks, latency, stale digests and exhausted retries so failures do not depend on a user reporting them.
+
+Do not log passwords, authorization headers, access tokens or full private request bodies. Allowlist fields, restrict access and retention, and treat caller-provided IDs and strings as untrusted diagnostic data.
+
+**Say it:** "I want to answer which task failed, at which boundary, for which request or run, and what the user can do next, without copying their secrets into logs."
+
+**Follow-up:** "Where do you investigate first?" Start with the user's reference and time, follow the request or run through the relevant service and datastore operation, then compare errors and latency with baseline metrics. An alert should have an owner and a recovery step.
+
+#### Put it together: a two-minute spoken rehearsal
+
+This is a short route through the longer notes above. Practice it aloud and shorten it to your natural pace; two minutes is a rehearsal target, not a reading-time guarantee.
+
+> Imagine an internal request tracker. The browser makes it clear whether a request is loading, empty, denied or failed. It preserves an unsaved draft, but it is not our security boundary.
+>
+> The API validates the input, verifies who called it and checks whether that person can edit this specific record. A valid login does not grant access to every team's data.
+>
+> The API then uses its own limited service identity to reach the datastore. The person, the runtime and the deployer are different identities. Giving the runtime database access does not replace the person's authorization check.
+>
+> Durable records hold the accepted edit. A cache can speed permitted reads, but we define its freshness and invalidation rules. After a timeout, we reconcile the operation rather than assume the write failed and duplicate it.
+>
+> Separately, a scheduler starts the daily digest. We assume duplicate triggers, use a durable operation key, bound retries and total execution time, and record useful completion or partial failure. Triggered is not finished.
+>
+> Finally, request and run IDs let us connect a failed user task to the relevant logs, metrics and worker result. We capture enough to diagnose it, not tokens or private payloads. The design is successful when the person can finish the task or recover safely, not simply when every component is running.
+
+#### Rehearse a failure, not only the happy path
+
+Cover the answers and explain each one out loud before checking.
+
+<details><summary>The page is empty. Does that mean there are no records?</summary>
+
+No. Distinguish a successful empty response from loading, denial, a failed fetch or a stale cache. Inspect the authorized server response before claiming the datastore is empty.
+
+</details>
+
+<details><summary>The caller is signed in and the service account can write. Is the edit allowed?</summary>
+
+Not yet. Check the caller's permission for this action and record. Runtime permissions and caller authorization answer different questions.
+
+</details>
+
+<details><summary>The job returned success but produced zero digests. Did the task succeed?</summary>
+
+Only if zero was an expected, recorded outcome. Check eligibility, output counts, durable publication state and errors. A transport or process success is not automatically business success.
+
+</details>
+
+<details><summary>A retry arrives after the first attempt committed but lost its response. What prevents a duplicate?</summary>
+
+A stable operation key with durable enforcement and a recoverable result. A disabled button or in-memory flag is not enough across callers, processes and restarts.
+
+</details>
+
+**Self-check:** for each boundary, name its responsibility, one failure, one safeguard and the evidence that would show the task worked. Keep technical depth available after the short answer rather than reciting every implementation detail first.
+
+#### Further reading for these boundaries
+
+- [OWASP API Security: broken object-level authorization](https://owasp.org/API-Security/editions/2023/en/0xa1-broken-object-level-authorization/) explains why a record ID needs its own access check.
+- [Cloud Run service identity](https://docs.cloud.google.com/run/docs/securing/service-identity) separates runtime identity from other accounts.
+- [Cloud Scheduler overview](https://docs.cloud.google.com/scheduler/docs/overview) describes at-least-once delivery and idempotent targets.
+- [OWASP Logging Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/Logging_Cheat_Sheet.html) covers event correlation, sensitive-data exclusions and log protection.
+
 ### The questions behind the product names
 
 | Decision | Explain it to a stakeholder | Technical follow-up |
@@ -85,19 +217,43 @@ Terraform validation does not prove a configuration matches a live estate, can a
 
 ## 15-25: Connect Figma and rich interactive HTML
 
-### Figma: make a decision before writing the whole application
+### Figma: create the experience, then test the recovery path
 
-Use a prototype to test the workflow, not to prove the backend works. Show the starting point, the main action, the result and the recovery path. Ask a representative user to complete a task without coaching.
+Figma Design is a visual design tool. You create frames for screens, add text and shapes, arrange them with layout rules, and reuse components for repeated controls. In the Prototype tab, connect a button or other hotspot to a destination frame or overlay and define its interaction. Present that flow so someone can click through it. Those connected states create the experience you are testing; they do not create the production database, permission checks or recovery worker.
 
-A useful hypothetical flow is a solution brief review:
+**How I would build it:** Start with five frames: request, evidence, draft, changes requested, and approved. Give the draft a visible status and version. Make one reusable evidence card and button component; use auto layout to keep spacing consistent when the title or evidence gets longer. Connect "Review draft" to the draft frame, "Request changes" to an overlay with a reason, and "Return to draft" back to the preserved draft. Add a second branch for missing evidence and a third for an approval failure. Preview at desktop and phone sizes, then watch someone attempt the task without coaching.
 
-1. Choose an approved request.
-2. Inspect source evidence and missing fields.
-3. Review a generated draft with uncertainty visible.
-4. Edit or reject it.
-5. Approve the final version for its intended audience.
+Here, **recovery path means what the person can do after something goes wrong**. It is not Figma restoring a cloud service or proving an API retry works. The prototype makes the fallback understandable before engineering builds the real state machine. Show the failure, what work is safe, the available action and what happens next. A toast saying "Something went wrong" is not a recovery path.
 
-Ask: Where did the user hesitate? Did they understand draft versus approved? Could they recover from missing information? Bring those observations back into the design.
+### Strong hypothetical example: review a solution brief
+
+**Scenario:** A solutions engineer needs a brief for a retail operations team asking whether to pilot an AI support assistant. A discovery note says responses must cite approved policy. The data-retention requirement is missing. The reviewer must catch that gap before the brief can go to the customer. All company details and outcomes in this example are hypothetical.
+
+1. **Request:** Open "Retail support pilot" with the customer audience, reviewer and success measure. The measure is whether the reviewer can find the missing requirement and choose a safe next action, not whether they like the colors.
+2. **Evidence:** Show the discovery-note excerpt beside its source/date. Show "Retention policy: missing" as a gap, not a guessed requirement. Selecting the source opens an evidence panel without losing the current task.
+3. **Draft:** Show the suggested pilot plan and an explicit "Draft, not approved" badge. Put unsupported assumptions next to the relevant claim. The reviewer can edit the plan or return it with a specific question.
+4. **Recover from missing information:** Selecting "Request retention requirement" preserves the current draft and opens a question addressed to the request owner. The next state is "Waiting for evidence", not "Approved". When the requirement arrives, show what changed and require review of the new version.
+5. **Recover from an interrupted approval:** If the approval response is unknown, keep the draft and say "Approval status not confirmed". Offer "Check status", not another blind approval. The production design must check the saved version and use an idempotent approval action so a retry cannot duplicate delivery. Figma only simulates these states.
+6. **Finish deliberately:** On a confirmed success frame, show the approved version, reviewer and intended audience. Approval and sending are separate decisions. Provide "View approved brief" and a return route; do not silently send it.
+
+**Prototype test:** Ask a reviewer, "Get this brief ready for the customer without inventing the missing retention policy." Do they spot the gap, preserve their edits, request the right information and distinguish approved from sent? Then simulate a lost approval response. Can they check status without starting over or sending twice? Record hesitation, wrong turns, recovery success and any coaching needed. These are proposed measures, not results from a study already run.
+
+**Engineering handoff:** For each frame, record the entry condition, allowed action, persisted state, API outcome and acceptance test. For example: "Given the server saved approval but the response was lost, checking status must show that same approved version without creating a second approval or sending the brief." Design review decides whether the path makes sense; an integration test proves it works.
+
+<details markdown="1">
+<summary>Rehearse: why use Figma instead of immediately building the page?</summary>
+
+"I can test a risky workflow cheaply before connecting live systems. In this brief-review example, I would test whether the reviewer notices missing evidence and can recover from an uncertain approval without losing work. Figma lets us click through those states and improve the wording and layout. It does not prove persistence or duplicate prevention. I would turn the agreed states into an HTML prototype and then implementation tests against the real API."
+
+</details>
+
+### Proposed NWF idea: a signal-review card with an honest fallback
+
+**Proposal only, not a shipped NWF feature or a trading recommendation:** Prototype a watchlist signal card that separates market evidence, a model explanation and the person's decision. Show a dated price/signal snapshot, its source, the explanation's generation time and an obvious freshness label. Let the person open "Why this signal?" and inspect the evidence rather than treating a generated sentence as proof.
+
+The recovery branch is the point of the experiment. If a refresh fails, preserve the watchlist and show the last known result with its age and "Refresh failed". If it is too old for the chosen policy, withhold the current-signal claim and offer a retry or the underlying dated evidence. Do not turn stale data into a fresh buy/sell recommendation. If an explanation is unavailable, keep the verified numeric evidence visible with a clear explanation gap instead of inventing a reason.
+
+Create Figma variants for fresh, refreshing, stale, unavailable and recovered. Test whether someone can identify the age of the evidence and choose a sensible next step without confusing "cached" with "current". An HTML prototype can later simulate those states with visibly labelled fixture data. A real implementation would still need source/session validation, cache-age rules, bounded retries and consumer tests. This connects design recovery to actual cache and backend behavior without pretending the prototype supplies either.
 
 ### Rich HTML, sometimes called "deluxe HTML"
 
@@ -232,6 +388,9 @@ These references support concepts, not claims about an employer or any private p
 
 - [Claude Agent Skills overview](https://docs.anthropic.com/en/docs/agents-and-tools/agent-skills/overview)
 - [Figma guide to prototyping](https://help.figma.com/hc/en-us/articles/360040314193-Guide-to-prototyping-in-Figma)
+- [Frames in Figma Design](https://help.figma.com/hc/en-us/articles/360041539473-Frames-in-Figma-Design)
+- [Interactive button components](https://help.figma.com/hc/en-us/articles/39712951432343-Design-an-interactive-button-component)
+- [Auto layout in designs](https://help.figma.com/hc/en-us/articles/5731482952599-Toggle-on-auto-layout-in-designs)
 - [W3C page structure tutorial](https://www.w3.org/WAI/tutorials/page-structure/)
 
 Use the existing graph's Estate, Depth, AWS map, GHA and 66degrees layers for related technical and stakeholder practice. Product limits and prices change; check current official documentation before making a real deployment decision.
