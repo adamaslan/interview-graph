@@ -55,6 +55,138 @@ Use the graph's Estate and Depth layers to rehearse a generic frontend â†’ API â
 
 Cloud Run is one option for a container-based HTTP service or batch workload. Do not turn that into an assertion that every service, job or event-driven workload has the same execution model. Be ready to explain why the chosen product fits the workload.
 
+#### Walk the existing graph, then explain the boundary
+
+Keep **Estate** open for the components and their connections. Switch to **Depth** for the reasons behind them: identity, retries, caching and failure handling. Use the graph's service, datastore and scheduler nodes as prompts, not proof that a particular deployment works this way today.
+
+**One hypothetical example throughout:** an internal request tracker. A signed-in teammate opens a request, edits its summary and later sees a daily status digest. These are design examples, not claims about a real company or a shipped system.
+
+```text
+Browser -> API -> durable request records
+              -> optional cache for permitted reads
+Scheduler -> worker -> durable digest/run records
+Request IDs and run IDs connect the evidence across both paths.
+```
+
+The scheduler is a separate background path, not an extra hop that every browser request must wait for. Observability spans both paths.
+
+#### 1. Browser: make the task and its state understandable
+
+**Boundary:** the browser is the person's interface, not a trusted authority. It collects input, sends a request and translates the result into a useful next step. Anyone can change client-side code or send an HTTP request without using the page.
+
+**Example:** when the teammate opens request `R-42`, show loading while fetching it. A successful list response with no records is **empty**. A permission refusal is **denied**, not an empty list. A network failure or server failure is an **error**, not proof that no request exists. After saving, show the server-confirmed record, not an optimistic success that silently survives a failed write. Offer a safe retry without losing the draft.
+
+**Say it:** "The frontend helps the user do the task and recover from failure. Hiding an Edit button improves the experience, but the server must still enforce who can edit."
+
+**Follow-up:** "What if Save times out?" The write may have committed even though the response was lost. Reconcile with the server using a stable operation ID before blindly submitting it again.
+
+#### 2. API: validate, authenticate, then authorize the action
+
+**Boundary:** untrusted input becomes a controlled operation. **Validation** asks whether the request has an allowed shape and values. **Authentication** asks who the caller is. **Authorization** asks whether that caller may perform this action on this record, in this organization, now. Passing one check does not pass the others.
+
+**Example:** for an edit to `R-42`, reject an oversized summary or unexpected fields, verify the session or token, then check the caller's edit permission and organization membership. Derive trusted ownership from verified identity and stored records, not a browser-supplied `isAdmin` flag. Use safe database parameters and prevent overwriting a newer edit with an old version.
+
+**Say it:** "A valid token proves identity only after verification. It does not mean its holder can read or change every record. I authorize the specific action and object on the server."
+
+**Follow-up:** "What if someone changes the URL to another request ID?" Re-run the object-level permission check. A hard-to-guess identifier is not authorization. Return a safe denial response without leaking another team's record.
+
+#### 3. Service identity: separate the caller from the backend's powers
+
+**Boundary:** the backend's runtime identity controls what it can access in downstream systems. It is different from the teammate's identity and from the account that deployed the application. A trusted backend still needs an application-level decision about whose record it is handling.
+
+**Example:** a Cloud Run API can run as a dedicated service account. Give it only the datastore operations its work requires, scoped as narrowly as supported. A separate digest worker may need to read eligible requests and write digest results, without the ability to administer the project or change access policies. Use platform-provided credentials where supported rather than putting a long-lived service-account key in frontend code.
+
+**Say it:** "First I check whether this person may edit R-42. Then the service performs the permitted database operation using its own limited runtime identity. Backend access must not become a way for a user to borrow all of the service's powers."
+
+**Follow-up:** "Why not use Owner so it works?" Excess permissions increase the damage from a bug or compromise. Name the required operations, test allowed and denied cases, and keep deployment permissions separate.
+
+#### 4. Datastore and cache: decide which answer is authoritative
+
+**Boundary:** durable storage records accepted state. A cache holds a reusable copy that may be stale, missing or evicted. The role comes from the design, not the product name: a database product can store either authoritative records or cached results.
+
+**Example:** request records and their versions live in the durable datastore. A permitted request-list response may be cached briefly. After an edit, invalidate or update affected cached views, or explicitly tolerate and label a short stale period. Key any user-specific cache by the relevant authorization scope; never return one team's private response to another team. A cache miss means fetch from the source, not "the request was deleted."
+
+**Say it:** "I choose the source of truth first. Then I define what may be stale, for how long, and what happens when the cache is unavailable. A fast wrong answer is still wrong."
+
+**Follow-up:** "How do you avoid lost edits?" Use a transaction or version precondition appropriate to the datastore. If the expected version changed, return a conflict and let the user reconcile, rather than silently replacing newer work. Durability also needs a backup and recovery plan; it is not a promise that data can never be lost.
+
+#### 5. Scheduler and jobs: make repetition safe and completion visible
+
+**Boundary:** a trigger starts work; it does not prove the work finished. A schedule is not an exactly-once guarantee. Separate trigger delivery, worker execution and the useful business result.
+
+**Example:** the daily digest uses a stable key for the organization and scheduled period. A durable uniqueness check or transactional claim prevents two workers from publishing two digests for that key. Re-running safely returns or resumes the existing result. A check in process memory is not enough across restarts. If an external send is involved, use its supported deduplication mechanism or a durable outbox/reconciliation design; a database flag alone cannot make two separate systems atomic.
+
+Set a maximum attempt count, backoff and an overall deadline that includes child work. Retry transient failures, not permanent permission errors forever. Record attempts and a final state such as succeeded, failed or partial, with counts and a reason. A trigger acknowledgement or green process exit is not enough if no useful digest was produced.
+
+**Say it:** "I assume a trigger can repeat. The job must be safe to repeat, stop within a budget and leave a durable result someone can inspect."
+
+**Follow-up:** "What if it crashes halfway?" Resume from a durable checkpoint or repeat idempotent steps. Make partial work explicit and prevent overlapping runs from fighting over the same output.
+
+#### 6. Logs and metrics: connect the user's symptom to evidence
+
+**Boundary:** diagnostics must explain what happened without becoming a second store of private data. Logs describe individual events; metrics summarize rates, latency and freshness. A trace can connect timed operations across services.
+
+**Example:** the page displays a safe support reference after an edit fails. The API records a server-controlled request ID, operation, safe error code and duration. A digest has its own run ID, linked to the initiating request when one exists. Record whether zero output was expected, not merely that the worker exited. Monitor failed tasks, latency, stale digests and exhausted retries so failures do not depend on a user reporting them.
+
+Do not log passwords, authorization headers, access tokens or full private request bodies. Allowlist fields, restrict access and retention, and treat caller-provided IDs and strings as untrusted diagnostic data.
+
+**Say it:** "I want to answer which task failed, at which boundary, for which request or run, and what the user can do next, without copying their secrets into logs."
+
+**Follow-up:** "Where do you investigate first?" Start with the user's reference and time, follow the request or run through the relevant service and datastore operation, then compare errors and latency with baseline metrics. An alert should have an owner and a recovery step.
+
+#### Put it together: a two-minute spoken rehearsal
+
+This is a short route through the longer notes above. Practice it aloud and shorten it to your natural pace; two minutes is a rehearsal target, not a reading-time guarantee.
+
+> Imagine an internal request tracker. The browser makes it clear whether a request is loading, empty, denied or failed. It preserves an unsaved draft, but it is not our security boundary.
+>
+> The API validates the input, verifies who called it and checks whether that person can edit this specific record. A valid login does not grant access to every team's data.
+>
+> The API then uses its own limited service identity to reach the datastore. The person, the runtime and the deployer are different identities. Giving the runtime database access does not replace the person's authorization check.
+>
+> Durable records hold the accepted edit. A cache can speed permitted reads, but we define its freshness and invalidation rules. After a timeout, we reconcile the operation rather than assume the write failed and duplicate it.
+>
+> Separately, a scheduler starts the daily digest. We assume duplicate triggers, use a durable operation key, bound retries and total execution time, and record useful completion or partial failure. Triggered is not finished.
+>
+> Finally, request and run IDs let us connect a failed user task to the relevant logs, metrics and worker result. We capture enough to diagnose it, not tokens or private payloads. The design is successful when the person can finish the task or recover safely, not simply when every component is running.
+
+#### Rehearse a failure, not only the happy path
+
+Cover the answers and explain each one out loud before checking.
+
+<details><summary>The page is empty. Does that mean there are no records?</summary>
+
+No. Distinguish a successful empty response from loading, denial, a failed fetch or a stale cache. Inspect the authorized server response before claiming the datastore is empty.
+
+</details>
+
+<details><summary>The caller is signed in and the service account can write. Is the edit allowed?</summary>
+
+Not yet. Check the caller's permission for this action and record. Runtime permissions and caller authorization answer different questions.
+
+</details>
+
+<details><summary>The job returned success but produced zero digests. Did the task succeed?</summary>
+
+Only if zero was an expected, recorded outcome. Check eligibility, output counts, durable publication state and errors. A transport or process success is not automatically business success.
+
+</details>
+
+<details><summary>A retry arrives after the first attempt committed but lost its response. What prevents a duplicate?</summary>
+
+A stable operation key with durable enforcement and a recoverable result. A disabled button or in-memory flag is not enough across callers, processes and restarts.
+
+</details>
+
+**Self-check:** for each boundary, name its responsibility, one failure, one safeguard and the evidence that would show the task worked. Keep technical depth available after the short answer rather than reciting every implementation detail first.
+
+#### Further reading for these boundaries
+
+- [OWASP API Security: broken object-level authorization](https://owasp.org/API-Security/editions/2023/en/0xa1-broken-object-level-authorization/) explains why a record ID needs its own access check.
+- [Cloud Run service identity](https://docs.cloud.google.com/run/docs/securing/service-identity) separates runtime identity from other accounts.
+- [Cloud Scheduler overview](https://docs.cloud.google.com/scheduler/docs/overview) describes at-least-once delivery and idempotent targets.
+- [OWASP Logging Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/Logging_Cheat_Sheet.html) covers event correlation, sensitive-data exclusions and log protection.
+
 ### The questions behind the product names
 
 | Decision | Explain it to a stakeholder | Technical follow-up |
