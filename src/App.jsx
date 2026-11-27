@@ -51,6 +51,8 @@ export default function App() {
 
         <a href="./lessons/python-day1.html" className="text-xs underline" style={{ color: 'var(--fam-infra)' }}>Python Day 1 · 4h</a>
 
+        <a href="./lessons/nwf-pitches.html" className="text-xs underline" style={{ color: 'var(--fam-infra)' }}>NWF pitches · 10s to 2m</a>
+
         <nav className="flex flex-wrap gap-1" aria-label="Layers">
           {LAYERS.map(l => (
             <button key={l.id} className={`ctl ${layer === l.id ? 'active' : ''}`}
